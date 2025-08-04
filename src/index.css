@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes fadeInMove {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
