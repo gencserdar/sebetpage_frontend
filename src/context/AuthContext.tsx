@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { isLoggedIn } from "../services/authService";
 
 interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
+  setIsAuthenticated: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   loading: true,
+  setIsAuthenticated: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -15,13 +18,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    setIsAuthenticated(!!token);
+    setIsAuthenticated(isLoggedIn());
     setLoading(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, loading }}>
+    <AuthContext.Provider value={{ isAuthenticated, loading, setIsAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

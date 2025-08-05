@@ -1,4 +1,5 @@
 import {api} from "./apiService";
+import { useAuth } from "../context/AuthContext";
 
 export const getAccessToken = () => localStorage.getItem("token");
 
@@ -51,6 +52,7 @@ export async function login(email: string, password: string, rememberMe: boolean
     if (!token) throw new Error("No token returned");
 
     localStorage.setItem("token", token);
+    
     return true;
   } catch (err) {
     console.error("Login error:", err);
@@ -62,13 +64,14 @@ export async function register(
   name: string,
   surname: string,
   email: string,
-  password: string
+  password: string,
+  nickname: string
 ): Promise<boolean> {
   try {
     const res = await api("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, surname, email, password }),
+      body: JSON.stringify({ name, surname, email, password, nickname }),
     });
 
     if (!res.ok) {

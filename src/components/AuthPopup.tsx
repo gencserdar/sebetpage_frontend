@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { login, register, forgotPassword } from "../services/authService";
+import { useUser } from "../context/UserContext";
 
 interface Props {
-  initialMode: "login" | "register" | "forgot";
+  initialMode: "login" | "forgot";
   onSubmit: () => void;
   onClose: () => void;
 }
@@ -25,7 +25,8 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState(initialMode);
   const [showResetPopup, setShowResetPopup] = useState(false);
-
+  const { login, forgotPassword } = useUser();
+  
   // Slider state
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -36,6 +37,7 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: Props) {
   const sliderRef = useRef<HTMLDivElement | null>(null);
   const autoSlideRef = useRef<NodeJS.Timeout | null>(null);
   const animationRef = useRef<number | null>(null);
+  
 
   useEffect(() => {
     setError(null); // mod değiştiğinde hatayı temizle
@@ -369,15 +371,13 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: Props) {
 
       if (mode === "login") {
         success = await login(email, password, rememberMe);
-      } 
-      else if (mode === "forgot") {
-        success = await forgotPassword(email); // authService'ten gelecek
+      } else if (mode === "forgot") {
+        success = await forgotPassword(email);
         if (success) {
-          setShowResetPopup(true); // ✅ yeni state ile popup aç
+          setShowResetPopup(true);
           return;
         }
       }
-
       if (success) {
         onSubmit();
       }
@@ -386,7 +386,7 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: Props) {
     }
   };
 
-  const title = mode === "login" ? "Log in to your account" : mode === "register" ? "Create an account" : "Reset your password";
+  const title = mode === "login" ? "Log in to your account" : "Reset your password";
 
   return (
     <div className="relative flex flex-col md:flex-row text-white rounded-2xl overflow-hidden w-full max-w-4xl bg-white/10 backdrop-blur-xl backdrop-saturate-200 bg-gradient-to-br from-white/20 via-white/5 to-white/10 border border-white/20 shadow-lg shadow-black/40">

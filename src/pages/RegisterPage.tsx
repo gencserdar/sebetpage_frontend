@@ -7,6 +7,7 @@ export default function RegisterPage() {
   const [email, setEmail]           = useState("");
   const [password, setPassword]     = useState("");
   const [confirmPassword, setConf]  = useState("");
+  const [nickname, setNickname]     = useState("");
   const [error, setError]           = useState("");
   const [showPopup, setShowPopup]   = useState(false);
 
@@ -19,7 +20,7 @@ export default function RegisterPage() {
       return;
     }
     try {
-      await register(firstName, lastName, email, password);
+      await register(firstName, lastName, email, password, nickname);
       setShowPopup(true); // popup aç
     } catch (err: any) {
       setError(err.message || "Registration failed");
@@ -87,6 +88,14 @@ export default function RegisterPage() {
             className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none"
             value={confirmPassword}
             onChange={(e) => setConf(e.target.value)}
+            required
+          />
+          <input
+            type="text"
+            placeholder="Username"
+            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
             required
           />
 

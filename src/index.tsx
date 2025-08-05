@@ -4,10 +4,13 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AuthProvider } from "./context/AuthContext";
+import { UserProvider } from "./context/UserContext";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!).render(
   <AuthProvider>
-    <App />
+    <UserProvider>
+      <App />
+    </UserProvider>
   </AuthProvider>
 );
 
