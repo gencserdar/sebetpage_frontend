@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { getFriends } from "../../services/friendService";
 import { UserDTO } from "../../types/userDTO";
 
-export default function FriendsList() {
+interface FriendsListProps {
+  onSelectFriend: (friend: UserDTO) => void;
+}
+
+export default function FriendsList({ onSelectFriend }: FriendsListProps) {
   const [friends, setFriends] = useState<UserDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +38,8 @@ export default function FriendsList() {
       {friends.map((friend) => (
         <li
           key={friend.id}
-          className="flex items-center justify-start p-2 rounded-md bg-white/5 hover:bg-white/10 transition"
+          onClick={() => onSelectFriend(friend)}
+          className="flex items-center justify-start p-2 rounded-md bg-white/5 hover:bg-white/10 transition cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <img
