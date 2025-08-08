@@ -1,17 +1,13 @@
 import { SearchResponse } from "../types/searchTypes";
+import { api } from "./apiService";
 
-export async function searchUsersAndGroups(query: string, token: string): Promise<SearchResponse> {
-  const response = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export async function searchUsersAndGroups(query: string): Promise<SearchResponse> {
+  const response = await api(`/api/search?keyword=${encodeURIComponent(query)}`);
 
   if (!response.ok) {
     const err = await response.text();
     throw new Error(err);
   }
 
-  const data: SearchResponse = await response.json();
-  return data;
+  return await response.json();
 }

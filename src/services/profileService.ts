@@ -60,10 +60,9 @@ export const updateNickname = async (nickname: string): Promise<FieldUpdateRespo
 export const changePassword = async (oldPassword: string, newPassword: string) => {
   const res = await api("/api/profile/change-password", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" }, // Authorization otomatik eklenecek
     body: JSON.stringify({ oldPassword, newPassword }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.text();
 };
-

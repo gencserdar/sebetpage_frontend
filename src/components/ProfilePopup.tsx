@@ -58,8 +58,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
       if (!isOwnProfile && user.nickname) {
         try {
           console.log("Fetching friend status for:", user.nickname);
-          const token = localStorage.getItem("token") || "";
-          const statusResponse = await getFriendStatus(user.nickname, token);
+          const statusResponse = await getFriendStatus(user.nickname);
           console.log("Friend status response:", statusResponse);
           
           // If the response includes requestId for received requests
@@ -394,8 +393,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
     
     try {
       console.log("Sending friend request to:", user.nickname);
-      const token = localStorage.getItem("token") || "";
-      await sendFriendRequest(user.nickname, token);
+      await sendFriendRequest(user.nickname);
       console.log("Friend request sent successfully");
     } catch (err) {
       console.error("Failed to send friend request:", err);
