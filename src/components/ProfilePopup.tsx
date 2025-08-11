@@ -282,7 +282,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
             />
             <button
               onClick={() => handleSubmit(field)}
-              className="bg-purple-600/80 hover:bg-purple-600 p-3 rounded-lg text-white transition-all duration-200 backdrop-blur-sm"
+              className="bg-indigo-500/80 hover:bg-indigo-500 p-3 rounded-lg text-white transition-all duration-200 backdrop-blur-sm"
               disabled={loading}
             >
               {loading ? (
@@ -367,7 +367,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
       <div className="flex gap-3">
         <button
           onClick={handlePasswordSubmit}
-          className="flex-1 bg-purple-600/80 hover:bg-purple-600 p-3 rounded-lg text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
+          className="flex-1 bg-indigo-500/80 hover:bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
           disabled={loading}
         >
           {loading ? (
@@ -569,7 +569,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
                 {friendStatus === "none" && (
                   <button
                     onClick={handleAddFriend}
-                    className="bg-purple-600/80 hover:bg-purple-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
+                    className="bg-indigo-500/80 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
                   >
                     Add Friend
                   </button>
