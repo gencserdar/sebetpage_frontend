@@ -1,266 +1,410 @@
+// src/hooks/useChatSocket.ts
 import { useEffect, useRef, useCallback } from "react";
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { api } from "../services/apiService";
 import { ChatMessage } from "../types/ChatMessageType";
 import { WsMessageDTO } from "../types/WSMessageDTO";
-import { api } from "../services/apiService";
 
 /** Re-export Page so messageService's import keeps working */
 export type Page<T> = {
   content: T[];
   totalElements: number;
   totalPages: number;
-  number: number; // current page index
+  number: number;
   size: number;
   first: boolean;
   last: boolean;
 };
 
-type PrivateHandler = (msg: ChatMessage) => void;
-
 type ResolveResp = {
   conversationId: number;
-  myUserId: number;       // senderId olarak kullanılacak
+  myUserId: number;
   friendUserId: number;
 };
 
 type SubRecord = {
-  cb: (msg: WsMessageDTO) => void;
+  cb: (msg: WsMessageDTO | any) => void;
   sub?: StompSubscription;
 };
 
-export function useChatSocket(
-  principalEmail: string,
-  onPrivateMessage?: PrivateHandler // hâlâ /user/queue/messages dinlemek isteyenler için
-) {
-  const clientRef = useRef<Client | null>(null);
-  const convSubsRef = useRef<Map<number, SubRecord>>(new Map());
-  const resolveCacheRef = useRef<Map<string, ResolveResp>>(new Map()); // key: `${fromEmail}|${toEmail}`
+export type ReadState = {
+  myLastReadAt: string | null;
+  friendLastReadAt: string | null;
+  seenMyMessageId: number | null;
+  myUserId: number;
+  friendUserId: number;
+};
 
-  // --- friend events channel (for live friends/requests) ---
-  const friendEventCallbacksRef = useRef(new Set<(ev: any) => void>());
-  const friendSubRef = useRef<StompSubscription | null>(null);
+/* ===========================
+   Singleton WebSocket state (module level)
+   =========================== */
+let sharedClient: Client | null = null;
+const convSubs: Map<number, SubRecord> = new Map();
+
+let friendSub: StompSubscription | null = null;
+const friendCallbacks: Set<(ev: any) => void> = new Set();
+
+// Presence memory: userId -> online status
+const presenceState: Map<number, boolean> = new Map();
+
+function emitPresenceSnapshotTo(cb: (ev: any) => void) {
+  const users = Array.from(presenceState.entries()).map(([userId, online]) => ({
+    userId,
+    online,
+  }));
+  cb({ type: "PRESENCE_SNAPSHOT", users });
+}
+
+export function useChatSocket(principalEmail: string) {
+  const connectedOnceRef = useRef(false);
 
   useEffect(() => {
+    if (!principalEmail) return;
+
+    // Set JWT token in cookies for WebSocket authentication
     const token = localStorage.getItem("token");
-    if (!token) {
-      console.error("No token in localStorage");
-      return;
+    if (token) {
+      document.cookie = `jwt-token=${token}; Path=/; SameSite=Lax`;
     }
 
-    // JwtHandshakeInterceptor hangi cookie adını okuyorsa aynı olmalı:
-    document.cookie = `jwt-token=${token}; path=/; SameSite=Lax`;
+    // Create shared client if it doesn't exist
+    if (!sharedClient) {
+      sharedClient = new Client({
+        webSocketFactory: () => new SockJS("http://localhost:8085/ws"),
+        reconnectDelay: 5000,
+        heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+        
+        onConnect: () => {
+          console.log("WebSocket connected for:", principalEmail);
+          
+          // Subscribe to friends queue for presence and friend events
+          if (!friendSub) {
+            friendSub = sharedClient!.subscribe("/user/queue/friends", (message: IMessage) => {
+              try {
+                const event = JSON.parse(message.body);
 
-    const client = new Client({
-      webSocketFactory: () => new SockJS("http://localhost:8085/ws"),
-      reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
-      onConnect: () => {
-        console.log("WS connected as", principalEmail);
+                // Handle presence snapshot (initial state)
+                if (event?.type === "PRESENCE_SNAPSHOT" && Array.isArray(event.users)) {
+                  presenceState.clear();
+                  event.users.forEach((u: any) =>
+                    presenceState.set(Number(u.userId), !!u.online)
+                  );
+                } 
+                // Handle presence updates (real-time changes)
+                else if (event?.type === "PRESENCE_UPDATE") {
+                  presenceState.set(Number(event.userId), !!event.online);
+                }
 
-        // Eski özel-queue akışı (opsiyonel)
-        if (onPrivateMessage) {
-          client.subscribe("/user/queue/messages", (m: IMessage) => {
-            try {
-              onPrivateMessage(JSON.parse(m.body) as ChatMessage);
-            } catch (err) {
-              console.error("Parse error:", err);
-            }
-          });
-        }
-
-        // NEW: friend events (/user/queue/friends)
-        if (!friendSubRef.current) {
-          friendSubRef.current = client.subscribe("/user/queue/friends", (m: IMessage) => {
-            try {
-              const ev = JSON.parse(m.body);
-              friendEventCallbacksRef.current.forEach(cb => cb(ev));
-            } catch (e) {
-              console.error("Friend event parse error:", e);
-            }
-          });
-        }
-
-        // Auto re-subscribe for conversations
-        convSubsRef.current.forEach((rec, conversationId) => {
-          try {
-            rec.sub?.unsubscribe();
-            const sub = client.subscribe(`/topic/chat/${conversationId}`, (frame: IMessage) => {
-              try { rec.cb(JSON.parse(frame.body) as WsMessageDTO); }
-              catch (e) { console.error("Parse error:", e); }
+                // Notify all subscribed components
+                friendCallbacks.forEach((callback) => callback(event));
+              } catch (error) {
+                console.error("Friend event parse error:", error);
+              }
             });
-            rec.sub = sub;
-          } catch (e) {
-            console.error("Auto-resubscribe failed for", conversationId, e);
           }
-        });
-      },
-      onStompError: f => console.error("Broker error:", f.headers["message"], f.body),
-      onWebSocketError: e => console.error("WebSocket error:", e),
-      onWebSocketClose: e => console.log("WebSocket closed:", e),
-    });
 
-    client.activate();
-    clientRef.current = client;
+          // Request initial presence snapshot from server
+          sharedClient!.publish({ 
+            destination: "/app/friends/snapshot", 
+            body: "{}" 
+          });
 
-    return () => {
-      // tüm conversation subscription'larını kapat
-      convSubsRef.current.forEach(rec => rec.sub?.unsubscribe());
-      convSubsRef.current.clear();
+          // Reestablish conversation subscriptions after reconnect
+          convSubs.forEach((record, conversationId) => {
+            try { 
+              record.sub?.unsubscribe(); 
+            } catch {}
+            
+            record.sub = sharedClient!.subscribe(
+              `/user/queue/messages/${conversationId}`,
+              (frame: IMessage) => {
+                try { 
+                  record.cb(JSON.parse(frame.body)); 
+                } catch (error) { 
+                  console.error("Message parse error:", error); 
+                }
+              }
+            );
+          });
+        },
+        
+        onStompError: (frame) => {
+          console.error("STOMP Broker error:", frame.headers["message"], frame.body);
+        },
+        
+        onWebSocketError: (error) => {
+          console.error("WebSocket error:", error);
+        },
+        
+        onDisconnect: () => {
+          console.log("WebSocket disconnected");
+        }
+      });
 
-      // friend events sub kapat
-      friendSubRef.current?.unsubscribe();
-      friendSubRef.current = null;
-      friendEventCallbacksRef.current.clear();
-
-      client.deactivate();
-      document.cookie = "jwt-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [principalEmail, onPrivateMessage]);
-
-  /** (İsteğe bağlı) belirli bir conversation'a subscribe edebilirsin */
-  const subscribeToConversation = useCallback((
-    conversationId: number,
-    onMessage: (msg: WsMessageDTO) => void
-  ) => {
-    const c = clientRef.current;
-
-    // callback’i kaydet (bağlı olmasa bile)
-    const rec: SubRecord = { cb: onMessage, sub: undefined };
-    convSubsRef.current.set(conversationId, rec);
-
-    if (!c?.connected) {
-      console.warn("WS not connected yet, will subscribe after connect");
-      return () => {
-        const r = convSubsRef.current.get(conversationId);
-        r?.sub?.unsubscribe();
-        convSubsRef.current.delete(conversationId);
-      };
+      sharedClient.activate();
+      connectedOnceRef.current = true;
+    } else if (!sharedClient.active && !sharedClient.connected) {
+      // Reactivate if connection was lost
+      sharedClient.activate();
     }
 
-    // aynı convId için eski sub varsa kapat
-    convSubsRef.current.get(conversationId)?.sub?.unsubscribe();
-
-    const sub = c.subscribe(`/topic/chat/${conversationId}`, (frame: IMessage) => {
-      try { onMessage(JSON.parse(frame.body) as WsMessageDTO); }
-      catch (e) { console.error("Parse error:", e); }
-    });
-
-    convSubsRef.current.set(conversationId, { cb: onMessage, sub });
+    // Cleanup function - don't disconnect as it's shared
     return () => {
-      sub.unsubscribe();
-      convSubsRef.current.delete(conversationId);
+      // The shared client should persist across component unmounts
+      // Only disconnect when the entire app unmounts
     };
-  }, []);
+  }, [principalEmail]);
 
-  /** direct conversation resolve (REST) — cache'li */
-  const resolveDirectConversation = useCallback(async (fromEmail: string, toEmail: string): Promise<ResolveResp> => {
-    const key = `${fromEmail}|${toEmail}`;
-    const cached = resolveCacheRef.current.get(key);
-    if (cached) return cached;
+  /** Subscribe to a specific conversation for real-time messages */
+  const subscribeToConversation = useCallback(
+    (conversationId: number, onMessage: (msg: WsMessageDTO | any) => void) => {
+      const client = sharedClient;
 
-    try {
-      const res = await api(`/api/conversations/direct/resolve?friendEmail=${encodeURIComponent(toEmail)}`);
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => "");
+      // Store the subscription record
+      const record: SubRecord = { cb: onMessage, sub: undefined };
+      convSubs.set(conversationId, record);
+
+      if (!client?.connected) {
+        console.warn("WebSocket not connected yet, will subscribe after connection");
+        return () => {
+          const existingRecord = convSubs.get(conversationId);
+          existingRecord?.sub?.unsubscribe();
+          convSubs.delete(conversationId);
+        };
+      }
+
+      // Unsubscribe existing subscription if any
+      convSubs.get(conversationId)?.sub?.unsubscribe();
+
+      // Create new subscription
+      const subscription = client.subscribe(
+        `/user/queue/messages/${conversationId}`, 
+        (frame: IMessage) => {
+          try {
+            const messageData = JSON.parse(frame.body);
+            onMessage(messageData);
+          } catch (error) {
+            console.error("Message parse error:", error);
+          }
+        }
+      );
+
+      // Update the record with the new subscription
+      convSubs.set(conversationId, { cb: onMessage, sub: subscription });
+      
+      // Return unsubscribe function
+      return () => {
+        try { 
+          subscription.unsubscribe(); 
+        } catch {}
+        convSubs.delete(conversationId);
+      };
+    },
+    []
+  );
+
+  /** Resolve direct conversation between two users */
+  const resolveDirectConversation = useCallback(
+    async (fromEmail: string, toEmail: string): Promise<ResolveResp> => {
+      const response = await api(
+        `/api/conversations/direct/resolve?friendEmail=${encodeURIComponent(toEmail)}`
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
         try {
           const errorJson = errorText ? JSON.parse(errorText) : {};
-          throw new Error(`Resolve failed: ${errorJson.error || res.statusText}`);
+          throw new Error(errorJson.error || `Resolve failed: ${response.status} ${response.statusText}`);
         } catch {
-          throw new Error(`Resolve failed: ${res.status} ${res.statusText}`);
+          throw new Error(`Resolve failed: ${response.status} ${response.statusText}`);
         }
       }
-      const data = (await res.json()) as ResolveResp;
-      resolveCacheRef.current.set(key, data);
-      return data;
-    } catch (error) {
-      console.error('Error in resolveDirectConversation:', error);
-      throw error;
-    }
-  }, []);
+      
+      return response.json() as Promise<ResolveResp>;
+    },
+    []
+  );
 
-  /** Yeni AES akışını, eski sendMessage API üstünden kullan */
-  const sendMessage = useCallback(async (msg: ChatMessage) => {
-    const c = clientRef.current;
-    if (!c?.connected) {
-      console.warn("WS not connected, message skipped");
-      return;
-    }
+  /** Send message using legacy ChatMessage format */
+  const sendMessage = useCallback(
+    async (message: ChatMessage) => {
+      const client = sharedClient;
+      if (!client?.connected) {
+        console.warn("WebSocket not connected, message not sent");
+        return;
+      }
+      
+      const resolveResponse = await resolveDirectConversation(message.from, message.to);
+      client.publish({
+        destination: "/app/chat/send",
+        body: JSON.stringify({
+          conversationId: resolveResponse.conversationId,
+          senderId: resolveResponse.myUserId,
+          content: message.content,
+        }),
+      });
+    },
+    [resolveDirectConversation]
+  );
 
-    const r = await resolveDirectConversation(msg.from, msg.to);
-    const payload = {
-      conversationId: r.conversationId,
-      senderId: r.myUserId,
-      content: msg.content,
-    };
-    c.publish({ destination: "/app/chat/send", body: JSON.stringify(payload) });
-  }, [resolveDirectConversation]);
+  /** Send message directly to a conversation */
+  const sendToConversation = useCallback(
+    (conversationId: number, senderId: number, content: string) => {
+      const client = sharedClient;
+      if (!client?.connected) {
+        console.warn("WebSocket not connected, message not sent");
+        return;
+      }
+      
+      client.publish({
+        destination: "/app/chat/send",
+        body: JSON.stringify({ conversationId, senderId, content }),
+      });
+    },
+    []
+  ); 
 
-  /** Dilersen doğrudan yeni API'yi de kullanabilirsin */
-  const sendToConversation = useCallback((conversationId: number, senderId: number, content: string) => {
-    const c = clientRef.current;
-    if (!c?.connected) {
-      console.warn("WS not connected, message skipped");
-      return;
-    }
-    const payload = { conversationId, senderId, content };
-    c.publish({ destination: "/app/chat/send", body: JSON.stringify(payload) });
-  }, []);
+  /** Get latest messages in ascending order (for initial load) */
+  const getLatestMessagesAsc = useCallback(
+    async (conversationId: number, limit = 50): Promise<WsMessageDTO[]> => {
+      const response = await api(
+        `/api/conversations/${conversationId}/messages/latest?limit=${limit}`
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get latest messages: ${response.status} ${errorText}`);
+      }
+      
+      return response.json() as Promise<WsMessageDTO[]>;
+    }, 
+    []
+  );
 
-  /** Tarihçe yardımcıları */
-  const getLatestMessagesAsc = useCallback(async (conversationId: number, limit = 50) => {
-    const res = await api(`/api/conversations/${conversationId}/messages/latest?limit=${limit}`);
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`latest failed: ${res.status} ${t}`);
-    }
-    return res.json() as Promise<WsMessageDTO[]>;
-  }, []);
+  /** Get paginated messages in descending order (for loading older messages) */
+  const getPagedMessagesDesc = useCallback(
+    async (conversationId: number, page = 0, size = 50): Promise<Page<WsMessageDTO>> => {
+      const response = await api(
+        `/api/conversations/${conversationId}/messages?page=${page}&size=${size}`
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get paged messages: ${response.status} ${errorText}`);
+      }
+      
+      return response.json() as Promise<Page<WsMessageDTO>>;
+    },
+    []
+  );
 
-  const getPagedMessagesDesc = useCallback(async (conversationId: number, page = 0, size = 50) => {
-    const res = await api(`/api/conversations/${conversationId}/messages?page=${page}&size=${size}`);
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`page failed: ${res.status} ${t}`);
-    }
-    return res.json() as Promise<Page<WsMessageDTO>>;
-  }, []);
+  /** Get read state for a conversation */
+  const getReadState = useCallback(
+    async (conversationId: number): Promise<ReadState> => {
+      const response = await api(`/api/conversations/${conversationId}/messages/read-state`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get read state: ${response.status} ${errorText}`);
+      }
+      
+      return response.json() as Promise<ReadState>;
+    }, 
+    []
+  );
 
-  /** Opsiyonel: manuel disconnect */
+  /** Mark conversation as read */
+  const markRead = useCallback(
+    async (conversationId: number) => {
+      const response = await api(`/api/conversations/${conversationId}/messages/read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to mark as read: ${response.status} ${errorText}`);
+      }
+      
+      return response.json();
+    }, 
+    []
+  );
+
+  /** Subscribe to friend events (presence updates, friend removal, etc.) */
+  const subscribeFriendEvents = useCallback(
+    (callback: (event: any) => void) => {
+      friendCallbacks.add(callback);
+      
+      // Immediately send current presence snapshot to new subscriber
+      emitPresenceSnapshotTo(callback);
+      
+      // Return unsubscribe function
+      return () => {
+        friendCallbacks.delete(callback);
+      };
+    }, 
+    []
+  );
+
+  /** Get current online status of a user */
+  const getUserOnlineStatus = useCallback(
+    (userId: number): boolean => {
+      return presenceState.get(userId) || false;
+    },
+    []
+  );
+
+  /** Disconnect and cleanup all WebSocket connections */
   const disconnect = useCallback(() => {
     try {
-      convSubsRef.current.forEach(rec => rec.sub?.unsubscribe());
-      convSubsRef.current.clear();
-      friendSubRef.current?.unsubscribe();
-      friendSubRef.current = null;
-      friendEventCallbacksRef.current.clear();
-      clientRef.current?.deactivate();
-    } catch (e) {
-      console.error("Disconnect error", e);
+      // Unsubscribe from all conversations
+      convSubs.forEach((record) => record.sub?.unsubscribe());
+      convSubs.clear();
+      
+      // Unsubscribe from friends
+      friendSub?.unsubscribe();
+      friendSub = null;
+      friendCallbacks.clear();
+      
+      // Clear presence state
+      presenceState.clear();
+      
+      // Disconnect and cleanup client
+      sharedClient?.deactivate();
+      sharedClient = null;
+      
+      console.log("WebSocket disconnected and cleaned up");
+    } catch (error) {
+      console.error("Disconnect error:", error);
     }
-  }, []);
-
-  /** NEW: friend events subscribe */
-  const subscribeFriendEvents = useCallback((cb: (ev: any) => void) => {
-    friendEventCallbacksRef.current.add(cb);
-    return () => { friendEventCallbacksRef.current.delete(cb); }; // <- void
   }, []);
 
   return {
-    // chat
+    // Core chat functionality
     subscribeToConversation,
-    sendToConversation,
-    sendMessage,
-    disconnect,
     resolveDirectConversation,
+    sendMessage,
+    sendToConversation,
 
-    // history
+    // Message history
     getLatestMessagesAsc,
     getPagedMessagesDesc,
 
-    // friends
+    // Read receipts
+    getReadState,
+    markRead,
+
+    // Friends and presence
     subscribeFriendEvents,
+    getUserOnlineStatus,
+
+    // Utility
+    disconnect,
+    
+    // Connection state
+    isConnected: sharedClient?.connected || false,
   };
 }

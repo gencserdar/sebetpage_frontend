@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useChatSocket } from "../../hooks/useChatSocket";
+import { useChatSocketContext } from "../../context/ChatSocketContext";
 import { ChatMessage } from "../../types/ChatMessageType";
 import { WsMessageDTO } from "../../types/WSMessageDTO";
 
@@ -9,16 +9,16 @@ interface Props {
   friendEmail: string;
   friendNickname: string;
   onClose: () => void;
-  onRemoved?: () => void; // Called when friend removes you
-  unreadCount?: number; // Pass unread count from parent
-  onMarkAsRead?: () => void; // Called when messages are read
+  onRemoved?: () => void;
+  unreadCount?: number;
+  onMarkAsRead?: (conversationId: number) => void;
 }
 
 type RenderItem =
   | { type: "sep"; key: string; label: string }
   | { type: "msg"; key: string; data: WsMessageDTO };
 
-const PAGE_SIZE = 50; // hem latest hem paged için aynı
+const PAGE_SIZE = 50;
 
 export default function FriendChat({
   meEmail,
@@ -27,8 +27,7 @@ export default function FriendChat({
   friendNickname,
   onClose,
   onRemoved,
-  unreadCount = 0,
-  onMarkAsRead,
+  unreadCount = 0
 }: Props) {
   const [messages, setMessages] = useState<WsMessageDTO[]>([]);
   const [input, setInput] = useState("");
@@ -36,23 +35,29 @@ export default function FriendChat({
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [friendUserId, setFriendUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRemoved, setIsRemoved] = useState(false); // Track if friend removed you
+  const [isRemoved, setIsRemoved] = useState(false);
 
-  // pagination state
-  const [nextPage, setNextPage] = useState(1);      // latest (page0) yüklendi varsayımıyla 1'den başla
+  // SEEN
+  const [friendLastReadAt, setFriendLastReadAt] = useState<string | null>(null);
+
+  // pagination
+  const [nextPage, setNextPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   const listRef = useRef<HTMLDivElement | null>(null);
 
+  // Use the context instead of direct hook
   const {
     resolveDirectConversation,
     getLatestMessagesAsc,
-    getPagedMessagesDesc,         // ← eski sayfaları çekeceğiz
+    getPagedMessagesDesc,
     subscribeToConversation,
     sendMessage,
-    subscribeFriendEvents, // Use existing friend events subscription
-  } = useChatSocket(meEmail);
+    subscribeFriendEvents,
+    getReadState,
+    markRead,
+  } = useChatSocketContext();
 
   // === helpers ===
   const isToday = (d: Date) => {
@@ -97,18 +102,14 @@ export default function FriendChat({
     return items;
   }, [messages]);
 
-  // En alta scroll ve mark as read
+  // En alta scroll + okundu bildir
   useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-      // Mark messages as read when chat is open and messages are loaded
-      if (messages.length > 0 && onMarkAsRead) {
-        onMarkAsRead();
-      }
-    }
-  }, [messages, onMarkAsRead]);
+    const h = () => { if (conversationId) markRead(conversationId); };
+    window.addEventListener('focus', h);
+    return () => window.removeEventListener('focus', h);
+  }, [conversationId, markRead]);
 
-  // İlk açılış: resolve → latest (ASC) → subscribe
+  // İlk açılış: resolve → read-state → latest → subscribe
   useEffect(() => {
     let unsub: (() => void) | undefined;
     let friendshipUnsub: (() => void) | undefined;
@@ -123,53 +124,61 @@ export default function FriendChat({
         setMyUserId(r.myUserId);
         setFriendUserId(r.friendUserId);
 
+        // READ-STATE: karşı tarafın last_read_at
+        try {
+          const rs = await getReadState(r.conversationId);
+          if (mounted) {
+            setFriendLastReadAt(rs.friendLastReadAt || null);
+          }
+        } catch (e) {
+          console.warn("read-state failed", e);
+        }
+
         const latest = await getLatestMessagesAsc(r.conversationId, PAGE_SIZE);
         if (!mounted) return;
         setMessages(latest);
 
-        // pagination reset
-        setNextPage(1);                            // page0 = latest
-        setHasMore(latest.length >= PAGE_SIZE);    // 50'den azsa daha yoktur
+        setNextPage(1);
+        setHasMore(latest.length >= PAGE_SIZE);
 
-        unsub = subscribeToConversation(r.conversationId, (m: WsMessageDTO) => {
+        // canlı akış (mesaj + READ event)
+        unsub = subscribeToConversation(r.conversationId, (raw: any) => {
+          if (raw && raw.type === "READ") {
+            // karşı taraf okuduysa güncelle
+            if (Number(raw.readerUserId) === Number(r.friendUserId)) {
+              setFriendLastReadAt(raw.lastReadAt || null);
+            }
+            return;
+          }
+          const m = raw as WsMessageDTO;
           setMessages(prev => (prev.some(x => x.id === m.id) ? prev : [...prev, m]));
         });
 
-        // Subscribe to friendship changes
+        // (opsiyonel) friend events
         if (subscribeFriendEvents) {
           friendshipUnsub = subscribeFriendEvents((event: any) => {
-            console.log("Friend event received:", event); // Debug log
-            
-            // Check if this event is about the current friend being removed
-            if (event.type === 'FRIEND_REMOVED' && event.removedFriend) {
-              // Check if the removed friend matches the current chat friend
+            if (event?.type === "FRIEND_REMOVED" && event.removedFriend) {
               if (event.removedFriend.email === friendEmail || event.removedFriend.nickname === friendNickname) {
-                console.log("Friend removed detected for:", friendNickname);
                 setIsRemoved(true);
-                if (onRemoved) {
-                  onRemoved();
-                }
+                onRemoved?.();
               }
             }
           });
         }
       } catch (e) {
         console.error("FriendChat init failed:", e);
-        // If conversation resolution fails, friend might have removed you
-        if (e instanceof Error && e.message.includes('not found')) {
+        if (e instanceof Error && e.message.includes("not found")) {
           setIsRemoved(true);
-          if (onRemoved) {
-            onRemoved();
-          }
+          onRemoved?.();
         }
       } finally {
         if (mounted) setLoading(false);
       }
     })();
 
-    return () => { 
-      mounted = false; 
-      if (unsub) unsub(); 
+    return () => {
+      mounted = false;
+      if (unsub) unsub();
       if (friendshipUnsub) friendshipUnsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,14 +208,12 @@ export default function FriendChat({
       console.error("loadOlder failed:", e);
     } finally {
       setLoadingOlder(false);
-      // scroll pozisyonunu koru (prepend sonrası atlama olmasın)
       requestAnimationFrame(() => {
         const el2 = listRef.current;
         if (!el2) return;
         const newScrollHeight = el2.scrollHeight;
         const delta = newScrollHeight - prevScrollHeight;
-        // tepedeysek ~0 olur; yeni eklenen kadar aşağı it
-        el2.scrollTop = delta;
+        el2.scrollTop = delta; // prepend sonrası pozisyonu koru
       });
     }
   }, [conversationId, nextPage, hasMore, loadingOlder, getPagedMessagesDesc]);
@@ -226,36 +233,42 @@ export default function FriendChat({
 
   // Gönder
   const handleSend = useCallback(async () => {
-    if (isRemoved) return; // Don't allow sending if removed
-    
+    if (isRemoved) return;
+
     const text = input.trim();
     if (!text) return;
-    
+
     try {
       const msg: ChatMessage = { from: meEmail, to: friendEmail, content: text };
       await sendMessage(msg);
       setInput("");
     } catch (e) {
       console.error("Failed to send message:", e);
-      // If sending fails, friend might have removed you
-      if (e instanceof Error && (e.message.includes('not found') || e.message.includes('forbidden'))) {
+      if (e instanceof Error && (e.message.includes("not found") || e.message.includes("forbidden"))) {
         setIsRemoved(true);
-        if (onRemoved) {
-          onRemoved();
-        }
+        onRemoved?.();
       }
     }
   }, [input, meEmail, friendEmail, sendMessage, isRemoved, onRemoved]);
 
+  // "Seen" olacak mesaj id'si
+  const seenMyMessageId = useMemo(() => {
+    if (!friendLastReadAt || !myUserId) return null;
+    const t = new Date(friendLastReadAt).getTime();
+    let id: number | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.senderId === myUserId && new Date(m.createdAt).getTime() <= t) {
+        id = m.id;
+        break;
+      }
+    }
+    return id;
+  }, [friendLastReadAt, myUserId, messages]);
+
   // BALONCUK
   const Bubble = ({ m }: { m: WsMessageDTO }) => {
-    const senderIdNum = (m as any).senderId != null ? Number((m as any).senderId) : NaN;
-    const myId = myUserId != null ? Number(myUserId) : NaN;
-    const frId = friendUserId != null ? Number(friendUserId) : NaN;
-
-    const mine = !Number.isNaN(myId) ? senderIdNum === myId
-                : !Number.isNaN(frId) ? senderIdNum !== frId
-                : false;
+    const mine = m.senderId === myUserId;
 
     const name = mine ? meNickname : friendNickname;
     const bubbleCls = mine
@@ -271,6 +284,9 @@ export default function FriendChat({
           <div className={`rounded-2xl px-3 py-2 shadow-lg backdrop-blur-sm ${bubbleCls}`}>
             {m.content}
           </div>
+          {mine && seenMyMessageId === m.id && (
+            <div className="mt-1 text-[11px] text-indigo-300/80 text-right">Seen</div>
+          )}
         </div>
       </div>
     );
@@ -284,26 +300,19 @@ export default function FriendChat({
     </div>
   );
 
-  // Red unread indicator component
-  const UnreadBadge = ({ count }: { count: number }) => {
-    if (count === 0) return null;
-    return (
-      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-gray-950">
-        {count > 99 ? '99+' : count}
-      </div>
+  // Sadece kırmızı nokta (sayı yok) — unread indikasyonu
+  const UnreadDot = ({ show }: { show: boolean }) =>
+    !show ? null : (
+      <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 ml-2 align-middle" />
     );
-  };
 
   return (
     <div className="fixed bottom-4 right-4 bg-gray-950/98 backdrop-blur-xl p-4 rounded-2xl shadow-2xl w-96 text-white border border-gray-800/40">
       {/* header */}
       <div className="flex justify-between items-center mb-3 border-b border-gray-800/40 pb-3">
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <strong className="tracking-wide text-gray-100">{friendNickname}</strong>
-            {/* Unread indicator next to friend name */}
-            <UnreadBadge count={unreadCount} />
-          </div>
+          <strong className="tracking-wide text-gray-100">{friendNickname}</strong>
+          <UnreadDot show={(unreadCount ?? 0) > 0} />
           {isRemoved && (
             <span className="text-xs text-red-400 bg-red-500/20 px-2 py-1 rounded-full border border-red-500/30">
               Removed
@@ -312,11 +321,10 @@ export default function FriendChat({
         </div>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-gray-800/60 rounded-lg p-1 relative"
+          className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-gray-800/60 rounded-lg p-1"
+          title="Close"
         >
           ✕
-          {/* Unread indicator on close button when chat is minimized */}
-          <UnreadBadge count={unreadCount} />
         </button>
       </div>
 
