@@ -2,10 +2,6 @@ import { api } from "./apiService";
 import type { Page } from "../hooks/useChatSocket";
 import type { WsMessageDTO } from "../types/WSMessageDTO";
 
-// MessageDTO BE’de WsMessageDTO ile aynı alanlara sahipse direkt onu kullanıyoruz.
-// Yoksa ayrı tip tanımla.
-// Burada WsMessageDTO: { id, senderId, conversationId, content, createdAt }
-
 export async function fetchLatestMessages(conversationId: number, limit = 50): Promise<WsMessageDTO[]> {
   const res = await api(`/api/conversations/${conversationId}/messages/latest?limit=${limit}`);
   if (!res.ok) {

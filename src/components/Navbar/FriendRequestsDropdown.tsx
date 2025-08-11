@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { getIncomingRequests, respondToRequest } from "../../services/friendService";
 import { FriendRequest } from "../../types/friendRequestType";
+import { useChatSocket } from "../../hooks/useChatSocket";
 import { Users, Check, X } from "lucide-react";
 
 type LocalFriendRequest = FriendRequest & { 
@@ -19,6 +20,9 @@ export default function FriendRequestsDropdown() {
   const [incomingRequests, setIncomingRequests] = useState<LocalFriendRequest[]>([]);
   const [showRequestDropdown, setShowRequestDropdown] = useState(false);
 
+  // Use WebSocket hook for real-time updates
+  const { subscribeFriendEvents } = useChatSocket(user?.email || "");
+
   // Fetch incoming requests function
   const fetchIncomingRequests = async () => {
     if (user) {
@@ -31,10 +35,60 @@ export default function FriendRequestsDropdown() {
     }
   };
 
-  // Fetch incoming requests when user is available
+  // Initial fetch and WebSocket subscription
   useEffect(() => {
     fetchIncomingRequests();
-  }, [user]);
+
+    // Subscribe to real-time friend events
+    const unsubscribe = subscribeFriendEvents((event: any) => {
+      console.log("Friend event received:", event);
+      
+      const eventType = event?.type;
+      
+      switch (eventType) {
+        case "FRIEND_REQUEST_RECEIVED":
+          // New incoming request - add it to the list
+          if (event.request) {
+            setIncomingRequests(prev => {
+              // Check if request already exists to avoid duplicates
+              const exists = prev.some(req => req.id === event.request.id);
+              if (!exists) {
+                return [...prev, { ...event.request, isProcessing: false }];
+              }
+              return prev;
+            });
+          }
+          break;
+          
+        case "FRIEND_REQUEST_ACCEPTED":
+        case "FRIEND_REQUEST_REJECTED":
+          // Request was responded to - remove it from the list
+          if (event.requestId) {
+            setIncomingRequests(prev => prev.filter(req => req.id !== event.requestId));
+          }
+          break;
+          
+        case "FRIEND_REQUEST_CANCELLED":
+          // Someone cancelled their request to us - remove it
+          if (event.requestId) {
+            setIncomingRequests(prev => prev.filter(req => req.id !== event.requestId));
+          }
+          break;
+          
+        default:
+          // For any other friend-related events, refresh the list
+          if (eventType && (
+            eventType.includes("FRIEND") || 
+            eventType.includes("REQUEST")
+          )) {
+            fetchIncomingRequests();
+          }
+          break;
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, subscribeFriendEvents]);
 
   // Refetch requests when returning from a profile (location changes)
   useEffect(() => {
