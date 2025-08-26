@@ -501,7 +501,7 @@ export default function FriendChat({
               : "bg-gray-800/80 border-gray-750/40 focus:ring-indigo-500/60"
           }`}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder={isRemoved ? "Friend removed you..." : "Type a message…"}
+          placeholder={isRemoved ? "Friendship ended..." : "Type a message…"}
           disabled={isRemoved}
         />
         <button

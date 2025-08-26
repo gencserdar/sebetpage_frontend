@@ -566,62 +566,90 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
     }
   };
 
-  const handleToggleBlock = async () => {
-    const wasBlocked = isBlocked;
-    
-    // Store original values for potential reversion
-    const originalFriendStatus = friendStatus;
-    const originalOutgoingRequestId = outgoingRequestId;
-    const originalFriendRequestId = friendRequestId;
-    
-    setError(prev => ({ ...prev, block: null }));
+  // Replace the handleToggleBlock function in ProfilePopup with this fixed version:
 
-    try {
-      if (wasBlocked) {
-        // Unblocking - simpler case
-        setIsBlocked(false);
-        await unblockUser(user.id);
-        console.log("User unblocked successfully");
-      } else {
-        // Blocking - need to cancel friend request first, then block
-        
-        // Step 1: Cancel any existing friend request BEFORE blocking
-        if (outgoingRequestId) {
-          console.log("Cancelling outgoing request before block:", outgoingRequestId);
-          try {
-            await cancelOutgoingRequest(outgoingRequestId);
-            console.log("Outgoing friend request cancelled successfully before block");
-          } catch (cancelErr) {
-            console.error("Failed to cancel outgoing request before block:", cancelErr);
-            // Don't throw here - we still want to proceed with the block
-          }
+const handleToggleBlock = async () => {
+  const wasBlocked = isBlocked;
+  
+  // Store original values for potential reversion
+  const originalFriendStatus = friendStatus;
+  const originalOutgoingRequestId = outgoingRequestId;
+  const originalFriendRequestId = friendRequestId;
+  
+  setError(prev => ({ ...prev, block: null }));
+
+  try {
+    if (wasBlocked) {
+      // Unblocking - simpler case
+      setIsBlocked(false);
+      await unblockUser(user.id);
+      console.log("User unblocked successfully");
+    } else {
+      // Blocking - need to handle all relationship states first
+      
+      // Step 1: Handle existing relationships BEFORE blocking
+      
+      // If they are friends, remove friendship first
+      if (friendStatus === "friends") {
+        console.log("Removing friendship before block");
+        try {
+          await removeFriend(user.id);
+          console.log("Friendship removed successfully before block");
+        } catch (removeErr) {
+          console.error("Failed to remove friend before block:", removeErr);
+          // Don't throw here - we still want to proceed with the block
         }
-        
-        // Update UI state immediately after successful cancellation (or attempt)
-        setFriendStatus("none");
-        setFriendRequestId(null);
-        setOutgoingRequestId(null);
-        setIsBlocked(true);
-        
-        // Step 2: Now block the user
-        await blockUser(user.id);
-        console.log("User blocked successfully");
       }
-    } catch (err) {
-      console.error("Failed to toggle block:", err);
       
-      // Revert all optimistic updates on error
-      setIsBlocked(wasBlocked);
-      setFriendStatus(originalFriendStatus);
-      setOutgoingRequestId(originalOutgoingRequestId);
-      setFriendRequestId(originalFriendRequestId);
+      // If there's an outgoing request, cancel it
+      if (outgoingRequestId) {
+        console.log("Cancelling outgoing request before block:", outgoingRequestId);
+        try {
+          await cancelOutgoingRequest(outgoingRequestId);
+          console.log("Outgoing friend request cancelled successfully before block");
+        } catch (cancelErr) {
+          console.error("Failed to cancel outgoing request before block:", cancelErr);
+          // Don't throw here - we still want to proceed with the block
+        }
+      }
       
-      setError(prev => ({ 
-        ...prev, 
-        block: `Failed to ${wasBlocked ? 'unblock' : 'block'} user` 
-      }));
+      // If there's an incoming request, reject it
+      if (friendRequestId) {
+        console.log("Rejecting incoming request before block:", friendRequestId);
+        try {
+          await respondToRequest(friendRequestId, false);
+          console.log("Incoming friend request rejected successfully before block");
+        } catch (rejectErr) {
+          console.error("Failed to reject incoming request before block:", rejectErr);
+          // Don't throw here - we still want to proceed with the block
+        }
+      }
+      
+      // Update UI state immediately after handling relationships
+      setFriendStatus("none");
+      setFriendRequestId(null);
+      setOutgoingRequestId(null);
+      setIsBlocked(true);
+      
+      // Step 2: Now block the user
+      await blockUser(user.id);
+      console.log("User blocked successfully");
     }
-  };
+  } catch (err) {
+    console.error("Failed to toggle block:", err);
+    
+    // Revert all optimistic updates on error
+    setIsBlocked(wasBlocked);
+    setFriendStatus(originalFriendStatus);
+    setOutgoingRequestId(originalOutgoingRequestId);
+    setFriendRequestId(originalFriendRequestId);
+    
+    setError(prev => ({ 
+      ...prev, 
+      block: `Failed to ${wasBlocked ? 'unblock' : 'block'} user` 
+    }));
+  }
+};
 
   const showRemoveFriendConfirmation = () => {
     setConfirmationModal({
