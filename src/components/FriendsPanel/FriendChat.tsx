@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useChatSocketContext } from "../../context/ChatSocketContext";
 import { ChatMessage } from "../../types/ChatMessageType";
 import { WsMessageDTO } from "../../types/WSMessageDTO";
+import { useNavigate } from "react-router-dom";
+
 
 interface Props {
   meEmail: string;
@@ -101,6 +103,12 @@ export default function FriendChat({
     }
     return items;
   }, [messages]);
+
+  const navigate = useNavigate();
+  const openFriendProfile = useCallback(() => {
+    navigate(`/profile/${friendNickname}`);
+  }, [navigate, friendNickname]);
+
 
   // En alta scroll + okundu bildir
   useEffect(() => {
@@ -308,17 +316,28 @@ export default function FriendChat({
 
   return (
     <div className="fixed bottom-4 right-4 bg-gray-950/98 backdrop-blur-xl p-4 rounded-2xl shadow-2xl w-96 text-white border border-gray-800/40">
-      {/* header */}
+       {/* header */}
       <div className="flex justify-between items-center mb-3 border-b border-gray-800/40 pb-3">
         <div className="flex items-center gap-2">
-          <strong className="tracking-wide text-gray-100">{friendNickname}</strong>
+          <button
+            onClick={openFriendProfile}
+            onKeyDown={(e) => e.key === "Enter" && openFriendProfile()}
+            className="tracking-wide text-gray-100 font-semibold hover:text-indigo-300 transition-colors focus:outline-none rounded-md px-1 cursor-pointer"
+            title="Open profile"
+            aria-label={`Open ${friendNickname}'s profile`}
+          >
+            {friendNickname}
+          </button>
+
           <UnreadDot show={(unreadCount ?? 0) > 0} />
+
           {isRemoved && (
             <span className="text-xs text-red-400 bg-red-500/20 px-2 py-1 rounded-full border border-red-500/30">
               Removed
             </span>
           )}
         </div>
+
         <button
           onClick={onClose}
           className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-gray-800/60 rounded-lg p-1"
