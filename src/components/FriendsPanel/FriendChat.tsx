@@ -315,18 +315,83 @@ export default function FriendChat({
 
     return (
       <div
-        className={`w-full flex mb-2 ${mine ? "justify-end" : "justify-start"}`}
+        className={`w-full flex mb-1 ${mine ? "justify-end" : "justify-start"}`}
       >
-        <div className="max-w-[75%]">
+        <div
+          className={`max-w-[75%] flex flex-col ${
+            mine ? "items-end" : "items-start"
+          }`}
+        >
           <div
-            className={`text-xs text-gray-500 mb-1 px-1 ${
+            className={`text-xs text-gray-500 px-1 ${
               mine ? "text-right" : "text-left"
-            }`}
+            } ${(() => {
+              // Find the index of this message in the messages array
+              const idx = messages.findIndex((msg) => msg.id === m.id);
+              let showDetail = true;
+              if (idx > 0) {
+                const prev = messages[idx - 1];
+                const prevTime = new Date(prev.createdAt).getTime();
+                const currTime = new Date(m.createdAt).getTime();
+                // If previous message is from the same sender and within 1 minute, hide name/time
+                if (
+                  prev.senderId === m.senderId &&
+                  currTime - prevTime < 60 * 1000
+                ) {
+                  showDetail = false;
+                }
+              }
+              return showDetail ? "mb-1" : "mb-0";
+            })()}`}
           >
-            {name} • {fmtTime(m.createdAt)}
+            {(() => {
+              // Find the index of this message in the messages array
+              const idx = messages.findIndex((msg) => msg.id === m.id);
+              let showDetail = true;
+              if (idx > 0) {
+                const prev = messages[idx - 1];
+                const prevTime = new Date(prev.createdAt).getTime();
+                const currTime = new Date(m.createdAt).getTime();
+                // If previous message is from the same sender and within 1 minute, hide name/time
+                if (
+                  prev.senderId === m.senderId &&
+                  currTime - prevTime < 60 * 1000
+                ) {
+                  showDetail = false;
+                }
+              }
+              return (
+                showDetail && (
+                  <span>
+                    {name} • {fmtTime(m.createdAt)}
+                  </span>
+                )
+              );
+            })()}
           </div>
           <div
-            className={`rounded-2xl px-3 py-2 shadow-lg backdrop-blur-sm ${bubbleCls}`}
+            className={`inline-block break-words rounded-2xl px-3 py-1 shadow-lg backdrop-blur-sm ${bubbleCls} ${(() => {
+              // Find the index of this message in the messages array
+              const idx = messages.findIndex((msg) => msg.id === m.id);
+              let showDetail = true;
+              if (idx > 0) {
+                const prev = messages[idx - 1];
+                const prevTime = new Date(prev.createdAt).getTime();
+                const currTime = new Date(m.createdAt).getTime();
+                if (
+                  prev.senderId === m.senderId &&
+                  currTime - prevTime < 60 * 1000
+                ) {
+                  showDetail = false;
+                }
+              }
+              // If showDetail, add sharp corner
+              if (showDetail) {
+                return mine ? "rounded-tr-none" : "rounded-tl-none";
+              }
+              return "";
+            })()}`}
+            style={{ maxWidth: "100%" }}
           >
             {m.content}
           </div>
@@ -342,7 +407,7 @@ export default function FriendChat({
 
   const DaySeparator = ({ label }: { label: string }) => (
     <div className="w-full flex justify-center my-3">
-      <span className="text-xs px-3 py-1 rounded-full bg-gray-800/60 text-gray-400 border border-gray-700/30">
+      <span className="text-xs px-3 py-2 rounded-full bg-gray-800/60 text-gray-400 border border-gray-700/30">
         {label}
       </span>
     </div>
