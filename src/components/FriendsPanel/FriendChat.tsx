@@ -4,7 +4,6 @@ import { ChatMessage } from "../../types/ChatMessageType";
 import { WsMessageDTO } from "../../types/WSMessageDTO";
 import { useNavigate } from "react-router-dom";
 
-
 interface Props {
   meEmail: string;
   meNickname: string;
@@ -29,7 +28,7 @@ export default function FriendChat({
   friendNickname,
   onClose,
   onRemoved,
-  unreadCount = 0
+  unreadCount = 0,
 }: Props) {
   const [messages, setMessages] = useState<WsMessageDTO[]>([]);
   const [input, setInput] = useState("");
@@ -64,9 +63,11 @@ export default function FriendChat({
   // === helpers ===
   const isToday = (d: Date) => {
     const now = new Date();
-    return d.getDate() === now.getDate() &&
+    return (
+      d.getDate() === now.getDate() &&
       d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear();
+      d.getFullYear() === now.getFullYear()
+    );
   };
 
   const fmtTime = (iso: string) => {
@@ -82,9 +83,19 @@ export default function FriendChat({
 
   const dayLabel = (d: Date) => {
     if (isToday(d)) return "Today";
-    const y = new Date(); y.setDate(y.getDate() - 1);
-    if (d.getDate() === y.getDate() && d.getMonth() === y.getMonth() && d.getFullYear() === y.getFullYear()) return "Yesterday";
-    return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    if (
+      d.getDate() === y.getDate() &&
+      d.getMonth() === y.getMonth() &&
+      d.getFullYear() === y.getFullYear()
+    )
+      return "Yesterday";
+    return d.toLocaleDateString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   // Gün ayraçları
@@ -109,12 +120,13 @@ export default function FriendChat({
     navigate(`/profile/${friendNickname}`);
   }, [navigate, friendNickname]);
 
-
   // En alta scroll + okundu bildir
   useEffect(() => {
-    const h = () => { if (conversationId) markRead(conversationId); };
-    window.addEventListener('focus', h);
-    return () => window.removeEventListener('focus', h);
+    const h = () => {
+      if (conversationId) markRead(conversationId);
+    };
+    window.addEventListener("focus", h);
+    return () => window.removeEventListener("focus", h);
   }, [conversationId, markRead]);
 
   // İlk açılış: resolve → read-state → latest → subscribe
@@ -159,14 +171,19 @@ export default function FriendChat({
             return;
           }
           const m = raw as WsMessageDTO;
-          setMessages(prev => (prev.some(x => x.id === m.id) ? prev : [...prev, m]));
+          setMessages((prev) =>
+            prev.some((x) => x.id === m.id) ? prev : [...prev, m]
+          );
         });
 
         // (opsiyonel) friend events
         if (subscribeFriendEvents) {
           friendshipUnsub = subscribeFriendEvents((event: any) => {
             if (event?.type === "FRIEND_REMOVED" && event.removedFriend) {
-              if (event.removedFriend.email === friendEmail || event.removedFriend.nickname === friendNickname) {
+              if (
+                event.removedFriend.email === friendEmail ||
+                event.removedFriend.nickname === friendNickname
+              ) {
                 setIsRemoved(true);
                 onRemoved?.();
               }
@@ -201,16 +218,20 @@ export default function FriendChat({
     const prevScrollHeight = el?.scrollHeight ?? 0;
 
     try {
-      const pageData = await getPagedMessagesDesc(conversationId, nextPage, PAGE_SIZE); // DESC gelir
+      const pageData = await getPagedMessagesDesc(
+        conversationId,
+        nextPage,
+        PAGE_SIZE
+      ); // DESC gelir
       const olderAsc = pageData.content.slice().reverse(); // ASC sıraya çevir
 
-      setMessages(prev => {
-        const existing = new Set(prev.map(x => x.id));
-        const filtered = olderAsc.filter(m => !existing.has(m.id));
+      setMessages((prev) => {
+        const existing = new Set(prev.map((x) => x.id));
+        const filtered = olderAsc.filter((m) => !existing.has(m.id));
         return filtered.length ? [...filtered, ...prev] : prev;
       });
 
-      setNextPage(p => p + 1);
+      setNextPage((p) => p + 1);
       if (pageData.last || pageData.content.length === 0) setHasMore(false);
     } catch (e) {
       console.error("loadOlder failed:", e);
@@ -236,7 +257,9 @@ export default function FriendChat({
       }
     };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => { el.removeEventListener("scroll", onScroll); };
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [hasMore, loadingOlder, loadOlder]);
 
   // Gönder
@@ -247,12 +270,19 @@ export default function FriendChat({
     if (!text) return;
 
     try {
-      const msg: ChatMessage = { from: meEmail, to: friendEmail, content: text };
+      const msg: ChatMessage = {
+        from: meEmail,
+        to: friendEmail,
+        content: text,
+      };
       await sendMessage(msg);
       setInput("");
     } catch (e) {
       console.error("Failed to send message:", e);
-      if (e instanceof Error && (e.message.includes("not found") || e.message.includes("forbidden"))) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("not found") || e.message.includes("forbidden"))
+      ) {
         setIsRemoved(true);
         onRemoved?.();
       }
@@ -284,16 +314,26 @@ export default function FriendChat({
       : "bg-gray-800/80 text-gray-100 border border-gray-700/40";
 
     return (
-      <div className={`w-full flex mb-2 ${mine ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`w-full flex mb-2 ${mine ? "justify-end" : "justify-start"}`}
+      >
         <div className="max-w-[75%]">
-          <div className={`text-xs text-gray-500 mb-1 px-1 ${mine ? "text-right" : "text-left"}`}>
+          <div
+            className={`text-xs text-gray-500 mb-1 px-1 ${
+              mine ? "text-right" : "text-left"
+            }`}
+          >
             {name} • {fmtTime(m.createdAt)}
           </div>
-          <div className={`rounded-2xl px-3 py-2 shadow-lg backdrop-blur-sm ${bubbleCls}`}>
+          <div
+            className={`rounded-2xl px-3 py-2 shadow-lg backdrop-blur-sm ${bubbleCls}`}
+          >
             {m.content}
           </div>
           {mine && seenMyMessageId === m.id && (
-            <div className="mt-1 text-[11px] text-indigo-300/80 text-right">Seen</div>
+            <div className="mt-1 text-[11px] text-indigo-300/80 text-right">
+              Seen
+            </div>
           )}
         </div>
       </div>
@@ -316,7 +356,7 @@ export default function FriendChat({
 
   return (
     <div className="fixed bottom-4 right-4 bg-gray-950/98 backdrop-blur-xl p-4 rounded-2xl shadow-2xl w-96 text-white border border-gray-800/40">
-       {/* header */}
+      {/* header */}
       <div className="flex justify-between items-center mb-3 border-b border-gray-800/40 pb-3">
         <div className="flex items-center gap-2">
           <button
@@ -360,10 +400,15 @@ export default function FriendChat({
       <div
         ref={listRef}
         className="h-80 overflow-y-auto mb-3 bg-gradient-to-b from-gray-900/60 to-black/80 p-3 rounded-xl"
-        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.5) rgba(0,0,0,.4)" }}
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(99,102,241,.5) rgba(0,0,0,.4)",
+        }}
       >
         {loadingOlder && (
-          <div className="text-center text-xs text-gray-500 mb-2">Loading older…</div>
+          <div className="text-center text-xs text-gray-500 mb-2">
+            Loading older…
+          </div>
         )}
         {loading ? (
           <div className="text-gray-500">Loading...</div>
@@ -371,7 +416,11 @@ export default function FriendChat({
           <div className="text-gray-500">No messages yet.</div>
         ) : (
           renderItems.map((it) =>
-            it.type === "sep" ? <DaySeparator key={it.key} label={it.label} /> : <Bubble key={it.key} m={it.data} />
+            it.type === "sep" ? (
+              <DaySeparator key={it.key} label={it.label} />
+            ) : (
+              <Bubble key={it.key} m={it.data} />
+            )
           )
         )}
       </div>
@@ -382,8 +431,8 @@ export default function FriendChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none focus:ring-2 border backdrop-blur-sm ${
-            isRemoved 
-              ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed" 
+            isRemoved
+              ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed"
               : "bg-gray-800/80 border-gray-750/40 focus:ring-indigo-500/60"
           }`}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
@@ -399,11 +448,11 @@ export default function FriendChat({
           }`}
           disabled={!conversationId || isRemoved}
           title={
-            isRemoved 
-              ? "Friend removed you" 
-              : !conversationId 
-                ? "Connecting..." 
-                : "Send"
+            isRemoved
+              ? "Friend removed you"
+              : !conversationId
+              ? "Connecting..."
+              : "Send"
           }
         >
           Send
