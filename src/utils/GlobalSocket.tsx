@@ -1,5 +1,5 @@
 import { useUser } from "../context/UserContext";
-import { useChatSocket } from "../hooks/useChatSocket";
+import { useChatSocket } from "../hooks/useWebSocket";
 
 export default function GlobalSocket() {
   const { user } = useUser();

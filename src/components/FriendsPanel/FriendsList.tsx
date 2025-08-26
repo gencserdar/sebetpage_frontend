@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { getFriends } from "../../services/friendService";
 import { UserDTO } from "../../types/userDTO";
-import { useChatSocket } from "../../hooks/useChatSocket";
+import { useChatSocket } from "../../hooks/useWebSocket";
 import { useUser } from "../../context/UserContext";
 
 interface FriendsListProps {

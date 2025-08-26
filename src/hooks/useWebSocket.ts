@@ -84,9 +84,13 @@ export function useChatSocket(principalEmail: string) {
             friendSub = sharedClient!.subscribe("/user/queue/friends", (message: IMessage) => {
               try {
                 const event = JSON.parse(message.body);
+                
+                // Add detailed logging for friend events
+                console.log("Raw friend event received:", event);
 
                 // Handle presence snapshot (initial state)
                 if (event?.type === "PRESENCE_SNAPSHOT" && Array.isArray(event.users)) {
+                  console.log("Processing presence snapshot with users:", event.users);
                   presenceState.clear();
                   event.users.forEach((u: any) =>
                     presenceState.set(Number(u.userId), !!u.online)
@@ -94,13 +98,24 @@ export function useChatSocket(principalEmail: string) {
                 } 
                 // Handle presence updates (real-time changes)
                 else if (event?.type === "PRESENCE_UPDATE") {
+                  console.log("Processing presence update:", event);
                   presenceState.set(Number(event.userId), !!event.online);
+                }
+                // Handle friend request events
+                else if (event?.type?.includes("FRIEND_REQUEST")) {
+                  console.log("Processing friend request event:", {
+                    type: event.type,
+                    requestId: event.requestId,
+                    request: event.request,
+                    fullEvent: event
+                  });
                 }
 
                 // Notify all subscribed components
+                console.log("Notifying", friendCallbacks.size, "friend event subscribers");
                 friendCallbacks.forEach((callback) => callback(event));
               } catch (error) {
-                console.error("Friend event parse error:", error);
+                console.error("Friend event parse error:", error, "Raw message:", message.body);
               }
             });
           }

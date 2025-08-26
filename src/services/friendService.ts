@@ -3,73 +3,70 @@ import { FriendRequest } from "../types/friendRequestType";
 import { FriendStatusResponse } from "../types/FriendStatusResponseType";
 import { UserDTO } from "../types/userDTO";
 
-// İstek gönder
-export async function sendFriendRequest(nickname: string) {
-  const res = await api(`/api/friend-request/send/${nickname}`, {
-    method: "POST",
-  });
-
+/* ---------- helpers ---------- */
+async function ensureOk(res: Response) {
   if (!res.ok) {
-    throw new Error(await res.text());
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
   }
 }
 
-// Gelen istekleri al
-export async function getIncomingRequests(): Promise<FriendRequest[]> {
-  const res = await api("/api/friend-request/incoming");
-  if (!res.ok) throw new Error("Failed to fetch incoming requests");
-  return await res.json();
-}
+/* ---------- send / respond / cancel ---------- */
 
-// Giden istekleri al
-export async function getOutgoingRequests(): Promise<FriendRequest[]> {
-  const res = await api("/api/friend-request/outgoing");
-  if (!res.ok) throw new Error("Failed to fetch outgoing requests");
-  return await res.json();
+// İstek gönder - now returns response with status and requestId
+export async function sendFriendRequest(nickname: string): Promise<{ status: string; requestId?: number }> {
+  const res = await api(`/api/friend-request/send/${encodeURIComponent(nickname)}`, {
+    method: "POST",
+  });
+  await ensureOk(res);
+  return res.json(); // Returns { status: "sent", requestId: number } or { status: "friends" }
 }
 
 // İstek yanıtla
-export async function respondToRequest(id: number, accept: boolean) {
-  const res = await api(`/api/friend-request/respond?requestId=${id}&accept=${accept}`, {
-    method: "POST",
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error("Something went wrong: " + err);
-  }
+export async function respondToRequest(id: number, accept: boolean): Promise<void> {
+  const qs = new URLSearchParams({ requestId: String(id), accept: String(accept) });
+  const res = await api(`/api/friend-request/respond?${qs.toString()}`, { method: "POST" });
+  await ensureOk(res);
 }
 
-// Arkadaşlık durumunu getir (örnek: "received", "sent", "friends", "none")
-export async function getFriendStatus(nickname: string): Promise<FriendStatusResponse> {
-  const res = await api(`/api/friends/status/${nickname}`);
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+// Giden isteği iptal et (ID ile)
+export async function cancelOutgoingRequest(requestId: number): Promise<void> {
+  const res = await api(`/api/friend-request/cancel/${requestId}`, { method: "DELETE" });
+  await ensureOk(res);
+}
 
-  return await res.json();
+/* ---------- lists / status / friends ---------- */
+
+// Gelen istekler
+export async function getIncomingRequests(): Promise<FriendRequest[]> {
+  const res = await api("/api/friend-request/incoming");
+  await ensureOk(res);
+  return res.json();
+}
+
+// Giden istekler
+export async function getOutgoingRequests(): Promise<FriendRequest[]> {
+  const res = await api("/api/friend-request/outgoing");
+  await ensureOk(res);
+  return res.json();
+}
+
+// Arkadaşlık durumu (received | sent | friends | none)
+export async function getFriendStatus(nickname: string): Promise<FriendStatusResponse> {
+  const res = await api(`/api/friends/status/${encodeURIComponent(nickname)}`);
+  await ensureOk(res);
+  return res.json();
 }
 
 // Arkadaş sil
 export async function removeFriend(userId: number): Promise<void> {
-  const res = await api(`/api/friends/remove/${userId}`, {
-    method: "DELETE",
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
+  const res = await api(`/api/friends/remove/${userId}`, { method: "DELETE" });
+  await ensureOk(res);
 }
 
-// Arkadaş listesini getir
+// Arkadaş listesi
 export async function getFriends(): Promise<UserDTO[]> {
   const res = await api("/api/friends");
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error("Failed to fetch friends: " + errorText);
-  }
-
-  return await res.json();
+  await ensureOk(res);
+  return res.json();
 }

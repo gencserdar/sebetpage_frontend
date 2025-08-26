@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Edit3, Camera, Check, X, UserMinus } from "lucide-react";
+import { Edit3, Camera, Check, X, UserMinus, Shield, ShieldOff } from "lucide-react";
 import { 
   uploadPhoto, 
   updateEmail, 
@@ -11,7 +11,8 @@ import {
 } from "../services/profileService";
 import { useUser } from "../context/UserContext";
 import { UserDTO } from "../types/userDTO";
-import { sendFriendRequest, getFriendStatus, respondToRequest, removeFriend } from "../services/friendService";
+import { sendFriendRequest, getFriendStatus, respondToRequest, removeFriend, cancelOutgoingRequest } from "../services/friendService";
+import { useBlockService } from "../services/blockService";
 
 interface ProfilePopupProps {
   onClose: () => void;
@@ -24,6 +25,7 @@ interface ErrorState {
   general?: string | null;
   photo?: string | null;
   password?: string | null;
+  block?: string | null;
 }
 
 type EditableField = 'name' | 'surname' | 'nickname' | 'email' | 'password';
@@ -50,35 +52,73 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const { nickname } = useParams<{ nickname: string }>();
   const [friendStatus, setFriendStatus] = useState<"self" | "friends" | "sent" | "received" | "none">("none");
   const [friendRequestId, setFriendRequestId] = useState<number | null>(null);
+  const [outgoingRequestId, setOutgoingRequestId] = useState<number | null>(null);
+
+  // Block service hook
+  const { blockUser, unblockUser, getBlockStatus, loading: blockLoading } = useBlockService();
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockStatusLoaded, setBlockStatusLoaded] = useState(false);
+
+  // Confirmation modal state
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    type: 'removeFriend' | 'block' | 'unblock' | 'cancelRequest';
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const isOwnProfile = currentUser?.id === localUser.id;
 
   useEffect(() => {
-    const fetchFriendStatus = async () => {
+    const fetchStatuses = async () => {
       if (!isOwnProfile && user.nickname) {
         try {
+          // Fetch friend status
           console.log("Fetching friend status for:", user.nickname);
           const statusResponse = await getFriendStatus(user.nickname);
           console.log("Friend status response:", statusResponse);
           
-          // If the response includes requestId for received requests
           if (typeof statusResponse === 'object' && statusResponse !== null && 'status' in statusResponse) {
-            console.log("Setting friend status:", (statusResponse as any).status);
-            console.log("Setting request ID:", (statusResponse as any).requestId);
-            setFriendStatus((statusResponse as any).status);
-            setFriendRequestId((statusResponse as any).requestId || null);
+            const status = (statusResponse as any).status;
+            const requestId = (statusResponse as any).requestId;
+            
+            console.log("Setting friend status:", status);
+            console.log("Setting request ID:", requestId);
+            
+            setFriendStatus(status);
+            
+            // Set the correct ID based on status
+            if (status === 'sent') {
+              setOutgoingRequestId(requestId || null);
+              setFriendRequestId(null); // Clear incoming request ID
+            } else if (status === 'received') {
+              setFriendRequestId(requestId || null);
+              setOutgoingRequestId(null); // Clear outgoing request ID
+            } else {
+              setFriendRequestId(null);
+              setOutgoingRequestId(null);
+            }
           } else {
             console.log("Setting friend status (simple):", statusResponse);
             setFriendStatus(statusResponse as "self" | "friends" | "sent" | "received" | "none");
+            // Clear both IDs for simple response
+            setFriendRequestId(null);
+            setOutgoingRequestId(null);
           }
+
+          // Fetch block status
+          const blockStatus = await getBlockStatus(user.nickname);
+          setIsBlocked(blockStatus.blockedByMe);
+          setBlockStatusLoaded(true);
         } catch (err) {
-          console.error("Failed to fetch friend status:", err);
+          console.error("Failed to fetch statuses:", err);
+          setBlockStatusLoaded(true);
         }
       }
     };
 
-    fetchFriendStatus();
-  }, [user.nickname, isOwnProfile]);
+    fetchStatuses();
+  }, [user.nickname, isOwnProfile, getBlockStatus]);
 
   const triggerHighlight = (field: string) => {
     setUpdatedFields(prev => {
@@ -388,18 +428,74 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   );
 
   const handleAddFriend = async () => {
-    // Immediately update UI (optimistic update)
-    setFriendStatus("sent");
-    
     try {
       console.log("Sending friend request to:", user.nickname);
-      await sendFriendRequest(user.nickname);
-      console.log("Friend request sent successfully");
+      const response = await sendFriendRequest(user.nickname);
+      console.log("Friend request response:", response);
+      
+      // Handle the structured response from backend
+      if (response && typeof response === 'object' && 'status' in response) {
+        console.log("Response status:", response.status);
+        
+        if (response.status === "sent") {
+          // Request was sent successfully
+          setFriendStatus("sent");
+          
+          // Make sure to set the outgoing request ID
+          if ('requestId' in response && response.requestId) {
+            setOutgoingRequestId(response.requestId);
+            console.log("Set outgoing request ID:", response.requestId);
+          } else {
+            console.error("Response status is 'sent' but no requestId found:", response);
+            // Try to fetch status to get the ID
+            try {
+              const statusResponse = await getFriendStatus(user.nickname);
+              if (typeof statusResponse === 'object' && statusResponse !== null && 'requestId' in statusResponse) {
+                setOutgoingRequestId((statusResponse as any).requestId);
+                console.log("Got request ID from status:", (statusResponse as any).requestId);
+              }
+            } catch (statusErr) {
+              console.error("Failed to fetch status after sending request:", statusErr);
+            }
+          }
+          
+        } else if (response.status === "friends") {
+          // Became friends immediately (reverse request existed)
+          setFriendStatus("friends");
+          setOutgoingRequestId(null);
+          setFriendRequestId(null);
+          console.log("Became friends immediately");
+          
+        } else {
+          console.error("Unexpected response status:", response.status);
+          setFriendStatus("sent"); // Fallback
+        }
+        
+      } else {
+        // Fallback for unexpected response format
+        console.error("Unexpected response format:", response);
+        setFriendStatus("sent");
+        
+        // Try to get request ID from status endpoint
+        try {
+          const statusResponse = await getFriendStatus(user.nickname);
+          if (typeof statusResponse === 'object' && statusResponse !== null && 'requestId' in statusResponse) {
+            setOutgoingRequestId((statusResponse as any).requestId);
+            console.log("Got request ID from status fallback:", (statusResponse as any).requestId);
+          }
+        } catch (statusErr) {
+          console.error("Failed to fetch status in fallback:", statusErr);
+        }
+      }
+      
     } catch (err) {
       console.error("Failed to send friend request:", err);
-      // Revert the optimistic update on error
-      setFriendStatus("none");
-      alert("Failed to send friend request.");
+      // Don't change UI state on error - let user try again
+      const errorMessage = err instanceof Error ? err.message : "Failed to send friend request.";
+      setError(prev => ({ 
+        ...prev, 
+        general: errorMessage 
+      }));
     }
   };
 
@@ -448,6 +544,142 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
       setFriendStatus("friends");
       alert("Failed to remove friend.");
     }
+  };
+
+  const handleToggleBlock = async () => {
+    const wasBlocked = isBlocked;
+    
+    // Store original values for potential reversion
+    const originalFriendStatus = friendStatus;
+    const originalOutgoingRequestId = outgoingRequestId;
+    const originalFriendRequestId = friendRequestId;
+    
+    setError(prev => ({ ...prev, block: null }));
+
+    try {
+      if (wasBlocked) {
+        // Unblocking - simpler case
+        setIsBlocked(false);
+        await unblockUser(user.id);
+        console.log("User unblocked successfully");
+      } else {
+        // Blocking - need to cancel friend request first, then block
+        
+        // Step 1: Cancel any existing friend request BEFORE blocking
+        if (outgoingRequestId) {
+          console.log("Cancelling outgoing request before block:", outgoingRequestId);
+          try {
+            await cancelOutgoingRequest(outgoingRequestId);
+            console.log("Outgoing friend request cancelled successfully before block");
+          } catch (cancelErr) {
+            console.error("Failed to cancel outgoing request before block:", cancelErr);
+            // Don't throw here - we still want to proceed with the block
+          }
+        }
+        
+        // Update UI state immediately after successful cancellation (or attempt)
+        setFriendStatus("none");
+        setFriendRequestId(null);
+        setOutgoingRequestId(null);
+        setIsBlocked(true);
+        
+        // Step 2: Now block the user
+        await blockUser(user.id);
+        console.log("User blocked successfully");
+      }
+    } catch (err) {
+      console.error("Failed to toggle block:", err);
+      
+      // Revert all optimistic updates on error
+      setIsBlocked(wasBlocked);
+      setFriendStatus(originalFriendStatus);
+      setOutgoingRequestId(originalOutgoingRequestId);
+      setFriendRequestId(originalFriendRequestId);
+      
+      setError(prev => ({ 
+        ...prev, 
+        block: `Failed to ${wasBlocked ? 'unblock' : 'block'} user` 
+      }));
+    }
+  };
+
+  const showRemoveFriendConfirmation = () => {
+    setConfirmationModal({
+      isOpen: true,
+      type: 'removeFriend',
+      message: `Are you sure you want to remove ${localUser.name || localUser.nickname} from your friends?`,
+      onConfirm: () => {
+        setConfirmationModal(null);
+        handleRemoveFriend();
+      }
+    });
+  };
+
+  const showBlockConfirmation = () => {
+    const action = isBlocked ? 'unblock' : 'block';
+    const hasOutgoingRequest = outgoingRequestId !== null;
+    
+    setConfirmationModal({
+      isOpen: true,
+      type: isBlocked ? 'unblock' : 'block',
+      message: `Are you sure you want to ${action} ${localUser.name || localUser.nickname}?${
+        !isBlocked && (friendStatus === 'friends' || hasOutgoingRequest) 
+          ? " This will also remove them from your friends and cancel any pending friend requests." 
+          : ""
+      }`,
+      onConfirm: () => {
+        setConfirmationModal(null);
+        handleToggleBlock();
+      }
+    });
+  };
+
+  const closeConfirmationModal = () => {
+    setConfirmationModal(null);
+  };
+
+  const handleCancelRequest = async () => {
+    if (!outgoingRequestId) {
+      console.error("No outgoing request ID found");
+      return;
+    }
+
+    // Store original values for potential reversion
+    const originalStatus = friendStatus;
+    const originalRequestId = outgoingRequestId;
+
+    // Immediately update UI (optimistic update)
+    setFriendStatus("none");
+    setOutgoingRequestId(null);
+
+    try {
+      console.log("Cancelling request with ID:", originalRequestId);
+      await cancelOutgoingRequest(originalRequestId);
+      console.log("Friend request cancelled successfully");
+    } catch (err) {
+      console.error("Failed to cancel friend request:", err);
+      // Revert the optimistic update on error
+      setFriendStatus(originalStatus);
+      setOutgoingRequestId(originalRequestId);
+      
+      // Show error to user
+      setError(prev => ({ 
+        ...prev, 
+        general: "Failed to cancel friend request. Please try again." 
+      }));
+    }
+  };
+
+  const showCancelRequestConfirmation = () => {
+    setConfirmationModal({
+      isOpen: true,
+      type: 'cancelRequest',
+      message: `Are you sure you want to cancel your friend request to ${localUser.name || localUser.nickname}?`,
+      onConfirm: () => {
+        setConfirmationModal(null);
+        handleCancelRequest();
+      }
+    });
   };
 
   return (
@@ -557,66 +789,134 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
             </div>
           )}
 
+          {error.block && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg backdrop-blur-sm">
+              <p className="text-red-300 text-sm">{error.block}</p>
+            </div>
+          )}
+
           <div className="text-center">
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4">
               {localUser.name} {localUser.surname}
             </h1>
             <p className="text-lg md:text-xl mb-4 text-gray-200 truncate">@{localUser.nickname}</p>
 
-            {/* Friend action buttons - only show for other users' profiles */}
-            {!isOwnProfile && (
-              <div className="mt-4">
-                {friendStatus === "none" && (
-                  <button
-                    onClick={handleAddFriend}
-                    className="bg-indigo-500/80 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
-                  >
-                    Add Friend
-                  </button>
-                )}
-                
-                {friendStatus === "sent" && (
-                  <button 
-                    disabled 
-                    className="bg-gray-600 text-white font-semibold px-6 py-3 rounded-lg opacity-70 cursor-not-allowed"
-                  >
-                    Request Sent
-                  </button>
-                )}
-                
-                {friendStatus === "friends" && (
-                  <button
-                    onClick={handleRemoveFriend}
-                    className="bg-red-600/80 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2 mx-auto"
-                  >
-                    <UserMinus size={18} />
-                    Remove Friend
-                  </button>
-                )}
-                
-                {friendStatus === "received" && (
-                  <div className="flex gap-3 justify-center">
-                    <button
-                      onClick={handleAcceptRequest}
-                      className="bg-green-600/80 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2"
-                    >
-                      <Check size={18} />
-                      Accept
-                    </button>
-                    <button
-                      onClick={handleRejectRequest}
-                      className="bg-red-600/80 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2"
-                    >
-                      <X size={18} />
-                      Reject
-                    </button>
+            {/* Action buttons - only show for other users' profiles */}
+            {!isOwnProfile && blockStatusLoaded && (
+              <div className="mt-4 space-y-3">
+                {/* Friend buttons - only show if user is not blocked */}
+                {!isBlocked && (
+                  <div className="flex justify-center">
+                    {friendStatus === "none" && (
+                      <button
+                        onClick={handleAddFriend}
+                        className="bg-indigo-500/80 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
+                      >
+                        Add Friend
+                      </button>
+                    )}
+                    
+                    {friendStatus === "sent" && (
+                      <button
+                        onClick={showCancelRequestConfirmation}
+                        className="bg-red-600/80 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2"
+                      >
+                        <X size={18} />
+                        Cancel Request
+                      </button>
+                    )}
+                    
+                    {friendStatus === "friends" && (
+                      <button
+                        onClick={showRemoveFriendConfirmation}
+                        className="bg-red-600/80 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2"
+                      >
+                        <UserMinus size={18} />
+                        Remove Friend
+                      </button>
+                    )}
+                    
+                    {friendStatus === "received" && (
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          onClick={handleAcceptRequest}
+                          className="bg-green-600/80 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2"
+                        >
+                          <Check size={18} />
+                          Accept
+                        </button>
+                        <button
+                          onClick={handleRejectRequest}
+                          className="bg-red-600/80 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center gap-2"
+                        >
+                          <X size={18} />
+                          Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                {/* Block/Unblock button - moved below friend buttons */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={showBlockConfirmation}
+                    disabled={blockLoading}
+                    className={`flex items-center gap-2 font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm ${
+                      isBlocked 
+                        ? "bg-gray-600/80 hover:bg-gray-600 text-white" 
+                        : "bg-orange-600/80 hover:bg-orange-600 text-white"
+                    }`}
+                  >
+                    {blockLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <>
+                        {isBlocked ? <ShieldOff size={18} /> : <Shield size={18} />}
+                        {isBlocked ? "Unblock User" : "Block User"}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmationModal?.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-white mb-4">Confirm Action</h3>
+            <p className="text-gray-200 mb-6 leading-relaxed">
+              {confirmationModal.message}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={closeConfirmationModal}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 backdrop-blur-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmationModal.onConfirm}
+                className={`font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm ${
+                  confirmationModal.type === 'block' 
+                    ? 'bg-orange-600/80 hover:bg-orange-600 text-white'
+                    : confirmationModal.type === 'unblock'
+                    ? 'bg-gray-600/80 hover:bg-gray-600 text-white'
+                    : 'bg-red-600/80 hover:bg-red-600 text-white'
+                }`}
+              >
+                {confirmationModal.type === 'removeFriend' ? 'Remove' : 
+                 confirmationModal.type === 'block' ? 'Block' : 
+                 confirmationModal.type === 'unblock' ? 'Unblock' : 'Cancel Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { getIncomingRequests, respondToRequest } from "../../services/friendService";
 import { FriendRequest } from "../../types/friendRequestType";
-import { useChatSocket } from "../../hooks/useChatSocket";
+import { useChatSocket } from "../../hooks/useWebSocket";
 import { Users, Check, X } from "lucide-react";
 
 type LocalFriendRequest = FriendRequest & { 
@@ -28,11 +28,25 @@ export default function FriendRequestsDropdown() {
     if (user) {
       try {
         const res = await getIncomingRequests();
+        console.log("Fetched incoming requests:", res);
         setIncomingRequests(res.map(req => ({ ...req, isProcessing: false })));
       } catch (err) {
         console.error("Failed to fetch incoming requests:", err);
       }
     }
+  };
+
+  // Handle dropdown toggle with refresh
+  const handleDropdownToggle = () => {
+    setShowRequestDropdown((prev) => {
+      const newState = !prev;
+      // Refresh requests when opening the dropdown
+      if (newState) {
+        console.log("Dropdown opened, refreshing requests...");
+        fetchIncomingRequests();
+      }
+      return newState;
+    });
   };
 
   // Initial fetch and WebSocket subscription
@@ -41,7 +55,8 @@ export default function FriendRequestsDropdown() {
 
     // Subscribe to real-time friend events
     const unsubscribe = subscribeFriendEvents((event: any) => {
-      console.log("Friend event received:", event);
+      console.log("Friend event received in FriendRequestsDropdown:", event);
+      console.log("Current incoming requests before processing:", incomingRequests.map(r => ({id: r.id, from: r.fromUser.nickname})));
       
       const eventType = event?.type;
       
@@ -49,6 +64,7 @@ export default function FriendRequestsDropdown() {
         case "FRIEND_REQUEST_RECEIVED":
           // New incoming request - add it to the list
           if (event.request) {
+            console.log("Adding new incoming request:", event.request);
             setIncomingRequests(prev => {
               // Check if request already exists to avoid duplicates
               const exists = prev.some(req => req.id === event.request.id);
@@ -64,15 +80,66 @@ export default function FriendRequestsDropdown() {
         case "FRIEND_REQUEST_REJECTED":
           // Request was responded to - remove it from the list
           if (event.requestId) {
+            console.log(`Removing ${eventType.split('_').pop()?.toLowerCase()} request with ID:`, event.requestId);
             setIncomingRequests(prev => prev.filter(req => req.id !== event.requestId));
           }
           break;
           
         case "FRIEND_REQUEST_CANCELLED":
           // Someone cancelled their request to us - remove it
-          if (event.requestId) {
-            setIncomingRequests(prev => prev.filter(req => req.id !== event.requestId));
-          }
+          console.log("🔴 CANCEL EVENT RECEIVED:", event);
+          console.log("🔴 Current requests before cancel:", incomingRequests.map(r => ({id: r.id, from: r.fromUser.nickname})));
+          console.log("🔴 Event structure:", {
+            requestId: event.requestId,
+            'request.id': event.request?.id,
+            'request': event.request,
+            'fromUserId': event.fromUserId,
+            'toUserId': event.toUserId,
+            fullEvent: event
+          });
+          
+          // Use functional state update to ensure we have the latest state
+          setIncomingRequests(currentRequests => {
+            console.log("🔴 Current requests in setState:", currentRequests.map(r => ({id: r.id, from: r.fromUser.nickname})));
+            
+            let filtered = currentRequests;
+            let removedCount = 0;
+            
+            if (event.requestId) {
+              console.log("🔴 Trying to remove by requestId:", event.requestId);
+              filtered = currentRequests.filter(req => req.id !== event.requestId);
+              removedCount = currentRequests.length - filtered.length;
+              console.log(`🔴 Removed ${removedCount} requests using requestId`);
+            } else if (event.request && event.request.id) {
+              console.log("🔴 Trying to remove by request.id:", event.request.id);
+              filtered = currentRequests.filter(req => req.id !== event.request.id);
+              removedCount = currentRequests.length - filtered.length;
+              console.log(`🔴 Removed ${removedCount} requests using request.id`);
+            } else if (event.fromUserId) {
+              console.log("🔴 Trying to remove by fromUserId:", event.fromUserId);
+              filtered = currentRequests.filter(req => req.fromUser.id !== event.fromUserId);
+              removedCount = currentRequests.length - filtered.length;
+              console.log(`🔴 Removed ${removedCount} requests using fromUserId`);
+            } else {
+              console.warn("🔴 CANCEL event missing all identifiers:", event);
+            }
+            
+            console.log("🔴 Final filtered requests:", filtered.map(r => ({id: r.id, from: r.fromUser.nickname})));
+            
+            if (removedCount === 0) {
+              console.warn("🔴 NO REQUESTS WERE REMOVED!");
+              console.log("🔴 Original requests:", currentRequests.map(r => ({id: r.id, from: r.fromUser.nickname})));
+              console.log("🔴 Event data:", event);
+              
+              // As a last resort, refresh from server
+              setTimeout(() => {
+                console.log("🔴 Force refreshing from server...");
+                fetchIncomingRequests();
+              }, 100);
+            }
+            
+            return filtered;
+          });
           break;
           
         default:
@@ -81,6 +148,7 @@ export default function FriendRequestsDropdown() {
             eventType.includes("FRIEND") || 
             eventType.includes("REQUEST")
           )) {
+            console.log("Unknown friend event, refreshing list:", eventType);
             fetchIncomingRequests();
           }
           break;
@@ -94,11 +162,14 @@ export default function FriendRequestsDropdown() {
   useEffect(() => {
     // If we're back on the home page (no nickname in params), refetch requests
     if (!nickname && user && location.pathname === "/") {
+      console.log("Back on home page, refetching requests...");
       fetchIncomingRequests();
     }
   }, [location.pathname, nickname, user]);
 
   const handleRequestResponse = async (id: number, accept: boolean) => {
+    console.log(`${accept ? 'Accepting' : 'Rejecting'} request with ID:`, id);
+    
     // Immediately set the response status on frontend (optimistic update)
     setIncomingRequests((prev) =>
       prev.map((r) =>
@@ -113,6 +184,7 @@ export default function FriendRequestsDropdown() {
     try {
       // Make the backend call
       await respondToRequest(id, accept);
+      console.log(`Request ${accept ? 'accepted' : 'rejected'} successfully`);
 
       // Remove from list after showing the status for a short time
       setTimeout(() => {
@@ -141,7 +213,7 @@ export default function FriendRequestsDropdown() {
   return (
     <div className="relative ml-4">
       <button
-        onClick={() => setShowRequestDropdown((prev) => !prev)}
+        onClick={handleDropdownToggle}
         className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition"
         title="Friend Requests"
       >

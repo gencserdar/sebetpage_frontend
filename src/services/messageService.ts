@@ -1,5 +1,5 @@
 import { api } from "./apiService";
-import type { Page } from "../hooks/useChatSocket";
+import type { Page } from "../hooks/useWebSocket";
 import type { WsMessageDTO } from "../types/WSMessageDTO";
 
 export async function fetchLatestMessages(conversationId: number, limit = 50): Promise<WsMessageDTO[]> {

@@ -1,6 +1,6 @@
 // src/context/ChatSocketContext.tsx
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useChatSocket } from '../hooks/useChatSocket';
+import { useChatSocket } from '../hooks/useWebSocket';
 import { useUser } from './UserContext';
 
 // Re-export Page type for components that need it
