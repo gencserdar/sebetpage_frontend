@@ -353,20 +353,20 @@ export default function FriendChat({
                 const prevTime = new Date(prev.createdAt).getTime();
                 const currTime = new Date(m.createdAt).getTime();
                 // If previous message is from the same sender and within 1 minute, hide name/time
+                // If previous message is within the same minute (regardless of sender), hide name/time
+                const prevDate = new Date(prev.createdAt);
+                const currDate = new Date(m.createdAt);
                 if (
-                  prev.senderId === m.senderId &&
-                  currTime - prevTime < 60 * 1000
+                  prevDate.getFullYear() === currDate.getFullYear() &&
+                  prevDate.getMonth() === currDate.getMonth() &&
+                  prevDate.getDate() === currDate.getDate() &&
+                  prevDate.getHours() === currDate.getHours() &&
+                  prevDate.getMinutes() === currDate.getMinutes()
                 ) {
                   showDetail = false;
                 }
               }
-              return (
-                showDetail && (
-                  <span>
-                    {name} • {fmtTime(m.createdAt)}
-                  </span>
-                )
-              );
+              return showDetail && <span>{fmtTime(m.createdAt)}</span>;
             })()}
           </div>
           <div

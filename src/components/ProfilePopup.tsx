@@ -7,7 +7,7 @@ import {
   updateNameSurname, 
   updateNickname,
   changePassword,
-  FieldUpdateResponse
+  FieldUpdateResponse,
 } from "../services/profileService";
 import { useUser } from "../context/UserContext";
 import { UserDTO } from "../types/userDTO";
@@ -28,8 +28,8 @@ interface ErrorState {
   block?: string | null;
 }
 
-type EditableField = 'name' | 'surname' | 'nickname' | 'email' | 'password';
-type UserEditableField = Exclude<EditableField, 'password'>;
+type EditableField = "name" | "surname" | "nickname" | "email" | "password";
+type UserEditableField = Exclude<EditableField, "password">;
 
 export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const { user: currentUser, setUser } = useUser();
@@ -41,16 +41,20 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
   // Store original values when editing starts (excluding password)
   const originalValues = useRef<Partial<Pick<UserDTO, UserEditableField>>>({});
-  
+
   // Store temporary edit values (this prevents the "Not set" bug)
-  const [tempValues, setTempValues] = useState<Partial<Pick<UserDTO, UserEditableField>>>({});
+  const [tempValues, setTempValues] = useState<
+    Partial<Pick<UserDTO, UserEditableField>>
+  >({});
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { nickname } = useParams<{ nickname: string }>();
-  const [friendStatus, setFriendStatus] = useState<"self" | "friends" | "sent" | "received" | "none">("none");
+  const [friendStatus, setFriendStatus] = useState<
+    "self" | "friends" | "sent" | "received" | "none"
+  >("none");
   const [friendRequestId, setFriendRequestId] = useState<number | null>(null);
   const [outgoingRequestId, setOutgoingRequestId] = useState<number | null>(null);
 
@@ -121,13 +125,13 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   }, [user.nickname, isOwnProfile, getBlockStatus]);
 
   const triggerHighlight = (field: string) => {
-    setUpdatedFields(prev => {
+    setUpdatedFields((prev) => {
       const newSet = new Set(prev);
       newSet.add(field);
       return newSet;
     });
     setTimeout(() => {
-      setUpdatedFields(prev => {
+      setUpdatedFields((prev) => {
         const newSet = new Set(prev);
         newSet.delete(field);
         return newSet;
@@ -138,9 +142,13 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const startEditing = (field: EditableField) => {
     // Store the original value before editing (only for non-password fields)
     if (field !== "password") {
-      originalValues.current[field as UserEditableField] = localUser[field as UserEditableField];
+      originalValues.current[field as UserEditableField] =
+        localUser[field as UserEditableField];
       // Initialize temp value with current value
-      setTempValues(prev => ({ ...prev, [field]: localUser[field as UserEditableField] }));
+      setTempValues((prev) => ({
+        ...prev,
+        [field]: localUser[field as UserEditableField],
+      }));
     }
     setEditField(field);
   };
@@ -148,18 +156,18 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const cancelEditing = (field: EditableField) => {
     // Clear temp values and don't modify the actual user data
     if (field !== "password") {
-      setTempValues(prev => {
+      setTempValues((prev) => {
         const newTemp = { ...prev };
         delete newTemp[field as UserEditableField];
         return newTemp;
       });
       delete originalValues.current[field as UserEditableField];
     }
-    
+
     // Reset states
     setEditField(null);
-    setError(prev => ({ ...prev, [field]: null }));
-    
+    setError((prev) => ({ ...prev, [field]: null }));
+
     // Clear password form if canceling password edit
     if (field === "password") {
       setCurrentPassword("");
@@ -173,72 +181,78 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
       return;
     }
     // Update temp values instead of user data directly
-    setTempValues(prev => ({ ...prev, [field]: value }));
+    setTempValues((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (field: EditableField) => {
     setLoading(true);
-    setError(prev => ({ ...prev, [field]: null }));
-    
+    setError((prev) => ({ ...prev, [field]: null }));
+
     try {
       let response: FieldUpdateResponse | FieldUpdateResponse[];
-      
+
       if (field === "email") {
         const emailValue = tempValues.email || localUser.email;
         response = await updateEmail(emailValue);
         const newEmail = (response as FieldUpdateResponse).value;
-        setUser(prev => prev ? { ...prev, email: newEmail } : prev);
-        setLocalUser(prev => ({ ...prev, email: newEmail }));
+        setUser((prev) => (prev ? { ...prev, email: newEmail } : prev));
+        setLocalUser((prev) => ({ ...prev, email: newEmail }));
       } else if (field === "name" || field === "surname") {
         const nameValue = tempValues.name || localUser.name;
         const surnameValue = tempValues.surname || localUser.surname;
         response = await updateNameSurname(nameValue, surnameValue);
-        (response as FieldUpdateResponse[]).forEach(fieldUpdate => {
-          setUser(prev => prev ? { ...prev, [fieldUpdate.field]: fieldUpdate.value } : prev);
-          setLocalUser(prev => ({ ...prev, [fieldUpdate.field]: fieldUpdate.value }));
+        (response as FieldUpdateResponse[]).forEach((fieldUpdate) => {
+          setUser((prev) =>
+            prev ? { ...prev, [fieldUpdate.field]: fieldUpdate.value } : prev
+          );
+          setLocalUser((prev) => ({
+            ...prev,
+            [fieldUpdate.field]: fieldUpdate.value,
+          }));
         });
       } else if (field === "nickname") {
         const nicknameValue = tempValues.nickname || localUser.nickname;
         response = await updateNickname(nicknameValue);
         const newNickname = (response as FieldUpdateResponse).value;
-        setUser(prev => prev ? { ...prev, nickname: newNickname } : prev);
-        setLocalUser(prev => ({ ...prev, nickname: newNickname }));
+        setUser((prev) => (prev ? { ...prev, nickname: newNickname } : prev));
+        setLocalUser((prev) => ({ ...prev, nickname: newNickname }));
       }
 
-      
       // Clear original value and temp value since update was successful
       if (field !== "password") {
         delete originalValues.current[field as UserEditableField];
-        setTempValues(prev => {
+        setTempValues((prev) => {
           const newTemp = { ...prev };
           delete newTemp[field as UserEditableField];
           return newTemp;
         });
       }
-      
+
       triggerHighlight(field);
       setEditField(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Update failed";
-      setError(prev => ({ ...prev, [field]: errorMessage }));
-      
+      setError((prev) => ({ ...prev, [field]: errorMessage }));
+
       // Don't revert on error - keep the temp value for user to correct
     }
     setLoading(false);
   };
-  
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
-    
+
     try {
       setLoading(true);
       const response = await uploadPhoto(e.target.files[0]);
-      setUser(prev => prev ? { ...prev, profileImageUrl: response.value } : prev);
-      setLocalUser(prev => ({ ...prev, profileImageUrl: response.value }));
+      setUser((prev) =>
+        prev ? { ...prev, profileImageUrl: response.value } : prev
+      );
+      setLocalUser((prev) => ({ ...prev, profileImageUrl: response.value }));
       triggerHighlight("photo");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Upload failed";
-      setError(prev => ({ ...prev, photo: errorMessage }));
+      setError((prev) => ({ ...prev, photo: errorMessage }));
     } finally {
       setLoading(false);
     }
@@ -246,11 +260,11 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
   const handlePasswordSubmit = async () => {
     if (newPassword !== confirmPassword) {
-      setError(prev => ({ ...prev, password: "Passwords do not match" }));
+      setError((prev) => ({ ...prev, password: "Passwords do not match" }));
       return;
     }
     setLoading(true);
-    setError(prev => ({ ...prev, password: null }));
+    setError((prev) => ({ ...prev, password: null }));
     try {
       await changePassword(currentPassword, newPassword);
       setCurrentPassword("");
@@ -259,8 +273,9 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
       triggerHighlight("password");
       setEditField(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Password update failed";
-      setError(prev => ({ ...prev, password: errorMessage }));
+      const errorMessage =
+        err instanceof Error ? err.message : "Password update failed";
+      setError((prev) => ({ ...prev, password: errorMessage }));
     }
     setLoading(false);
   };
@@ -288,12 +303,17 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
     return localUser[field] || "";
   };
 
-  const renderField = (label: string, field: EditableField, type: string = "text") => {
+  const renderField = (
+    label: string,
+    field: EditableField,
+    type: string = "text"
+  ) => {
     const isEditing = editField === field;
     const highlight = updatedFields.has(field);
-    const displayValue = field !== "password" ? getFieldValue(field as UserEditableField) : "";
+    const displayValue =
+      field !== "password" ? getFieldValue(field as UserEditableField) : "";
     const canEdit = isOwnProfile;
-    
+
     return (
       <div className="group">
         <label className="block text-sm font-medium text-gray-300 mb-2 uppercase tracking-wider">
@@ -313,8 +333,8 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
                 }
               }}
               className={`bg-white/10 text-white rounded-lg px-4 py-3 flex-1 border transition-all duration-300 ${
-                highlight 
-                  ? "bg-green-500/20 border-green-400/50 shadow-lg shadow-green-500/20" 
+                highlight
+                  ? "bg-green-500/20 border-green-400/50 shadow-lg shadow-green-500/20"
                   : "border-white/20"
               } focus:border-white/40 focus:outline-none backdrop-blur-sm`}
               disabled={loading}
@@ -342,8 +362,8 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
         ) : (
           <div
             className={`flex items-center justify-between bg-white/5 rounded-lg px-4 py-3 border transition-all duration-300 backdrop-blur-sm ${
-              highlight 
-                ? "bg-green-500/20 border-green-400/50 shadow-lg shadow-green-500/20" 
+              highlight
+                ? "bg-green-500/20 border-green-400/50 shadow-lg shadow-green-500/20"
                 : "border-white/10"
             }`}
           >
@@ -399,11 +419,11 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
         />
       </div>
-      
+
       {error.password && (
         <p className="text-red-400 text-sm">{error.password}</p>
       )}
-      
+
       <div className="flex gap-3">
         <button
           onClick={handlePasswordSubmit}
@@ -501,11 +521,11 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
   const handleAcceptRequest = async () => {
     if (!friendRequestId) return;
-    
+
     // Immediately update UI (optimistic update)
     setFriendStatus("friends");
     setFriendRequestId(null);
-    
+
     try {
       await respondToRequest(friendRequestId, true);
       console.log("Accept request successful");
@@ -517,11 +537,11 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
   const handleRejectRequest = async () => {
     if (!friendRequestId) return;
-    
+
     // Immediately update UI (optimistic update)
     setFriendStatus("none");
     setFriendRequestId(null);
-    
+
     try {
       await respondToRequest(friendRequestId, false);
       console.log("Reject request successful");
@@ -534,7 +554,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const handleRemoveFriend = async () => {
     // Immediately update UI (optimistic update)
     setFriendStatus("none");
-    
+
     try {
       await removeFriend(user.id);
       console.log("Friend removed successfully");
@@ -684,18 +704,26 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl h-[740px] flex overflow-hidden border border-white/20 transition-all duration-300
-        ${isOwnProfile ? "w-full max-w-6xl" : "w-full max-w-md justify-center"}`}>
-
+      <div
+        className={`bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl h-[740px] flex overflow-hidden border border-white/20 transition-all duration-300
+        ${
+          isOwnProfile ? "w-full max-w-6xl" : "w-full max-w-md justify-center"
+        }`}
+      >
         {/* Sol kısım sadece kendi profilin ise görünür */}
         {isOwnProfile && (
           <div className="w-3/5 flex flex-col">
             <div className="px-12 pt-4 pb-6 border-b border-white/10">
               <div className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold text-white leading-relaxed">
-                  {editField === "password" ? "Change Password" : "Profile Settings"}
+                  {editField === "password"
+                    ? "Change Password"
+                    : "Profile Settings"}
                 </h2>
-                <button onClick={handleClose} className="text-gray-300 hover:text-white p-2 rounded-lg transition-colors duration-200">
+                <button
+                  onClick={handleClose}
+                  className="text-gray-300 hover:text-white p-2 rounded-lg transition-colors duration-200"
+                >
                   <X size={24} />
                 </button>
               </div>
@@ -719,12 +747,16 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
                   {/* Sadece kendi profilinde şifre alanı görünür */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2 uppercase tracking-wider">Password</label>
-                    <div className={`flex items-center justify-between bg-white/5 rounded-lg px-4 py-3 border backdrop-blur-sm transition-all duration-300 ${
-                      updatedFields.has("password") 
-                        ? "bg-green-500/20 border-green-400/50 shadow-lg shadow-green-500/20" 
-                        : "border-white/10"
-                    }`}>
+                    <label className="block text-sm font-medium text-gray-300 mb-2 uppercase tracking-wider">
+                      Password
+                    </label>
+                    <div
+                      className={`flex items-center justify-between bg-white/5 rounded-lg px-4 py-3 border backdrop-blur-sm transition-all duration-300 ${
+                        updatedFields.has("password")
+                          ? "bg-green-500/20 border-green-400/50 shadow-lg shadow-green-500/20"
+                          : "border-white/10"
+                      }`}
+                    >
                       <span className="text-gray-300">••••••••</span>
                       <button
                         onClick={() => startEditing("password")}
@@ -741,7 +773,11 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
         )}
 
         {/* Sağ kısım - her zaman görünür */}
-        <div className={`${isOwnProfile ? "w-2/5" : "w-full"} bg-white/5 backdrop-blur-sm flex flex-col p-6 border-l border-white/10`}>
+        <div
+          className={`${
+            isOwnProfile ? "w-2/5" : "w-full"
+          } bg-white/5 backdrop-blur-sm flex flex-col p-6 border-l border-white/10`}
+        >
           {!isOwnProfile && (
             <div className="flex justify-end mb-2">
               <button
@@ -755,13 +791,17 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           <div className="flex-1 flex items-center justify-center mb-6">
             <div className="relative w-full aspect-square max-h-full">
               <img
-                src={localUser.profileImageUrl || "https://via.placeholder.com/300"}
+                src={
+                  localUser.profileImageUrl || "https://via.placeholder.com/300"
+                }
                 alt="Profile"
                 className={`w-full h-full object-cover rounded-xl shadow-2xl transition-all duration-500 ${
-                  updatedFields.has("photo") ? "ring-4 ring-green-400/50 shadow-green-500/20" : ""
+                  updatedFields.has("photo")
+                    ? "ring-4 ring-green-400/50 shadow-green-500/20"
+                    : ""
                 }`}
               />
-              
+
               {isOwnProfile && (
                 <label className="absolute bottom-4 right-4 cursor-pointer">
                   <div className="bg-white/20 hover:bg-white/30 p-3 rounded-full text-white shadow-lg hover:shadow-xl transition-all duration-200 backdrop-blur-sm">
@@ -799,7 +839,9 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4">
               {localUser.name} {localUser.surname}
             </h1>
-            <p className="text-lg md:text-xl mb-4 text-gray-200 truncate">@{localUser.nickname}</p>
+            <p className="text-lg md:text-xl mb-4 text-gray-200 truncate">
+              @{localUser.nickname}
+            </p>
 
             {/* Action buttons - only show for other users' profiles */}
             {!isOwnProfile && blockStatusLoaded && (
