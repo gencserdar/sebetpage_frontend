@@ -1,32 +1,26 @@
 import { Fragment, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import FriendsList from "./FriendsList";
-import FriendChat from "./FriendChat";
-import { useUser } from "../../context/UserContext";
 import { UserDTO } from "../../types/userDTO";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  setSelectedFriend: (friend: UserDTO) => void;
 }
 
-export default function FriendsPanel({ isOpen, onClose }: Props) {
+export default function FriendsPanel({
+  isOpen,
+  onClose,
+  setSelectedFriend,
+}: Props) {
   const [activeTab, setActiveTab] = useState<"friends" | "suggestions">(
     "friends"
   );
-  const [selectedFriend, setSelectedFriend] = useState<UserDTO | null>(null);
-  const { user } = useUser();
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog
-        as="div"
-        className="relative z-50"
-        onClose={() => {
-          setSelectedFriend(null);
-          onClose();
-        }}
-      >
+      <Dialog as="div" className="relative z-50" onClose={() => {}}>
         <div className="fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">
             {/* Overlay */}
@@ -110,16 +104,6 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
                       <FriendsList onSelectFriend={setSelectedFriend} />
                     )}
                   </div>
-                  {/* Chat Window */}
-                  {selectedFriend && user && (
-                    <FriendChat
-                      meEmail={user.email}
-                      meNickname={user.nickname}
-                      friendEmail={selectedFriend.email}
-                      friendNickname={selectedFriend.nickname}
-                      onClose={() => setSelectedFriend(null)}
-                    />
-                  )}
                 </Dialog.Panel>
               </Transition.Child>
             </div>

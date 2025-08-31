@@ -9,6 +9,7 @@ import { useUser } from "../context/UserContext";
 import { getUserByNickname } from "../services/userService";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
+import FriendChat from "../components/FriendsPanel/FriendChat";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function HomePage() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const { user } = useUser();
+  const [selectedFriend, setSelectedFriend] = useState<UserDTO | null>(null);
 
   const [profilePopupOpen, setProfilePopupOpen] = useState(false);
   const [profileUser, setProfileUser] = useState<UserDTO | null>(null);
@@ -104,8 +106,22 @@ export default function HomePage() {
 
           <FriendsPanel
             isOpen={showFriendsPanel}
-            onClose={() => setShowFriendsPanel(false)}
+            onClose={() => {
+              console.log("closing panel");
+              setShowFriendsPanel(false);
+            }}
+            setSelectedFriend={setSelectedFriend}
           />
+
+          {user && selectedFriend && (
+            <FriendChat
+              meEmail={user.email}
+              meNickname={user.nickname}
+              friendEmail={selectedFriend.email}
+              friendNickname={selectedFriend.nickname}
+              onClose={() => setSelectedFriend(null)}
+            />
+          )}
         </>
       )}
 

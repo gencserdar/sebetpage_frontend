@@ -245,6 +245,15 @@ export default function FriendChat({
     }
   }, [conversationId, nextPage, hasMore, loadingOlder, getPagedMessagesDesc]);
 
+  useEffect(() => {
+    if (messages.length > PAGE_SIZE) return; // prevent scroll down on loading older messages
+
+    // scroll down on first load
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
   // Scroll listener: tepeye yaklaşınca eski sayfayı çek
   useEffect(() => {
     const el = listRef.current;
@@ -355,6 +364,7 @@ export default function FriendChat({
             })()}
           </div>
           <div
+            title={new Date(m.createdAt).toLocaleString()}
             className={`inline-block break-words rounded-2xl px-3 py-1 shadow-lg backdrop-blur-sm ${bubbleCls} ${(() => {
               // Find the index of this message in the messages array
               const idx = messages.findIndex((msg) => msg.id === m.id);
@@ -392,7 +402,7 @@ export default function FriendChat({
 
   const DaySeparator = ({ label }: { label: string }) => (
     <div className="w-full flex justify-center my-3">
-      <span className="text-xs px-3 py-2 rounded-full bg-gray-800/60 text-gray-400 border border-gray-700/30">
+      <span className="text-xs px-3 py-2 rounded-full bg-gray-800 text-gray-400 border border-gray-700/30">
         {label}
       </span>
     </div>
@@ -405,7 +415,10 @@ export default function FriendChat({
     );
 
   return (
-    <div className="fixed bottom-4 right-4 bg-gray-950/98 backdrop-blur-xl p-4 rounded-2xl shadow-2xl w-96 text-white border border-gray-800/40">
+    <div
+      style={{ zIndex: 51 }}
+      className="fixed bottom-4 right-4 bg-gray-950/98 backdrop-blur-xl p-4 rounded-2xl shadow-2xl w-96 text-white border border-gray-800/40"
+    >
       {/* header */}
       <div className="flex justify-between items-center mb-3 border-b border-gray-800/40 pb-3">
         <div className="flex items-center gap-2">
@@ -456,12 +469,27 @@ export default function FriendChat({
         }}
       >
         {loadingOlder && (
-          <div className="text-center text-xs text-gray-500 mb-2">
+          /*  <div className="text-center text-xs text-gray-500 mb-2">
             Loading older…
-          </div>
+          </div> */
+          <div
+            style={{
+              margin: "auto",
+              borderColor: "#4F52C1",
+              borderTopColor: "transparent",
+            }}
+            className="w-8 h-8 border-4 rounded-full animate-spin"
+          />
         )}
         {loading ? (
-          <div className="text-gray-500">Loading...</div>
+          <div
+            style={{
+              margin: "auto",
+              borderColor: "#4F52C1",
+              borderTopColor: "transparent",
+            }}
+            className="w-8 h-8 border-4 rounded-full animate-spin"
+          />
         ) : renderItems.length === 0 ? (
           <div className="text-gray-500">No messages yet.</div>
         ) : (
@@ -480,7 +508,7 @@ export default function FriendChat({
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none focus:ring-2 border backdrop-blur-sm ${
+          className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none border-none focus:ring-2 border backdrop-blur-sm ${
             isRemoved
               ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed"
               : "bg-gray-800/80 border-gray-750/40 focus:ring-indigo-500/60"
@@ -491,7 +519,7 @@ export default function FriendChat({
         />
         <button
           onClick={handleSend}
-          className={`px-3 py-2 rounded-xl transition-colors duration-200 border backdrop-blur-sm ${
+          className={`px-3 py-2 rounded-xl transition-colors duration-200 border-none backdrop-blur-sm ${
             isRemoved || !conversationId
               ? "bg-gray-800/50 border-gray-700/40 text-gray-500 cursor-not-allowed"
               : "bg-indigo-500/80 hover:bg-indigo-400/80 border-indigo-400/20 text-white"
