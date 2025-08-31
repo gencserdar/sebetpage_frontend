@@ -74,11 +74,7 @@ export default function FriendChat({
     const d = new Date(iso);
     const hh = d.getHours().toString().padStart(2, "0");
     const mm = d.getMinutes().toString().padStart(2, "0");
-    if (isToday(d)) return `${hh}:${mm}`;
-    const dd = d.getDate().toString().padStart(2, "0");
-    const mo = (d.getMonth() + 1).toString().padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${dd}.${mo}.${yyyy} ${hh}:${mm}`;
+    return `${hh}:${mm}`;
   };
 
   const dayLabel = (d: Date) => {
@@ -91,10 +87,12 @@ export default function FriendChat({
       d.getFullYear() === y.getFullYear()
     )
       return "Yesterday";
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
     return d.toLocaleDateString(undefined, {
       day: "2-digit",
       month: "short",
-      year: "numeric",
+      ...(sameYear ? {} : { year: "numeric" }),
     });
   };
 
@@ -307,8 +305,6 @@ export default function FriendChat({
   // BALONCUK
   const Bubble = ({ m }: { m: WsMessageDTO }) => {
     const mine = m.senderId === myUserId;
-
-    const name = mine ? meNickname : friendNickname;
     const bubbleCls = mine
       ? "bg-indigo-500/80 text-white border border-indigo-400/20"
       : "bg-gray-800/80 text-gray-100 border border-gray-700/40";
@@ -318,14 +314,12 @@ export default function FriendChat({
         className={`w-full flex mb-1 ${mine ? "justify-end" : "justify-start"}`}
       >
         <div
-          className={`max-w-[75%] flex flex-col ${
+          className={`w-full flex flex-col ${
             mine ? "items-end" : "items-start"
           }`}
         >
           <div
-            className={`text-xs text-gray-500 px-1 ${
-              mine ? "text-right" : "text-left"
-            } ${(() => {
+            className={`w-full text-xs text-gray-500 px-1 text-center ${(() => {
               // Find the index of this message in the messages array
               const idx = messages.findIndex((msg) => msg.id === m.id);
               let showDetail = true;
@@ -336,12 +330,12 @@ export default function FriendChat({
                 // If previous message is from the same sender and within 1 minute, hide name/time
                 if (
                   prev.senderId === m.senderId &&
-                  currTime - prevTime < 60 * 1000
+                  currTime - prevTime < 5 * 60 * 1000
                 ) {
                   showDetail = false;
                 }
               }
-              return showDetail ? "mb-1" : "mb-0";
+              return showDetail ? "mb-2" : "mb-0";
             })()}`}
           >
             {(() => {
@@ -352,17 +346,8 @@ export default function FriendChat({
                 const prev = messages[idx - 1];
                 const prevTime = new Date(prev.createdAt).getTime();
                 const currTime = new Date(m.createdAt).getTime();
-                // If previous message is from the same sender and within 1 minute, hide name/time
-                // If previous message is within the same minute (regardless of sender), hide name/time
-                const prevDate = new Date(prev.createdAt);
-                const currDate = new Date(m.createdAt);
-                if (
-                  prevDate.getFullYear() === currDate.getFullYear() &&
-                  prevDate.getMonth() === currDate.getMonth() &&
-                  prevDate.getDate() === currDate.getDate() &&
-                  prevDate.getHours() === currDate.getHours() &&
-                  prevDate.getMinutes() === currDate.getMinutes()
-                ) {
+                // If previous message is within 5 minutes (regardless of sender), hide name/time
+                if (currTime - prevTime < 5 * 60 * 1000) {
                   showDetail = false;
                 }
               }
@@ -391,7 +376,7 @@ export default function FriendChat({
               }
               return "";
             })()}`}
-            style={{ maxWidth: "100%" }}
+            style={{ maxWidth: "90%" }}
           >
             {m.content}
           </div>

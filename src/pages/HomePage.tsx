@@ -63,12 +63,12 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Navbar */}
-      <div className={`transition-all duration-300 ${showFriendsPanel ? "mr-[320px]" : ""}`}>
+      <div className="transition-all duration-300">
         <Navbar onAuthClick={handleAuthClick} shiftRight={showFriendsPanel} />
       </div>
 
       {/* Main content */}
-      <div className={`flex-1 transition-all duration-300 ${showFriendsPanel ? "mr-[320px]" : ""}`}>
+      <div className="flex-1 transition-all duration-300">
         {/* Hero Section */}
         <section className="flex flex-col items-center justify-center text-center px-4 py-24 md:py-40">
           <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 bg-clip-text text-transparent">
@@ -102,8 +102,10 @@ export default function HomePage() {
             <span className="font-medium">Messages</span>
           </button>
 
-
-          <FriendsPanel isOpen={showFriendsPanel} onClose={() => setShowFriendsPanel(false)} />
+          <FriendsPanel
+            isOpen={showFriendsPanel}
+            onClose={() => setShowFriendsPanel(false)}
+          />
         </>
       )}
 

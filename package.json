@@ -4,6 +4,7 @@
   "private": true,
   "proxy": "http://127.0.0.1:8085",
   "dependencies": {
+    "@headlessui/react": "^2.2.7",
     "@stomp/stompjs": "^7.1.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.4",
