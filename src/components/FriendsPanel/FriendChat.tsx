@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { useChatSocketContext } from "../../context/ChatSocketContext";
 import { ChatMessage } from "../../types/ChatMessageType";
 import { WsMessageDTO } from "../../types/WSMessageDTO";
@@ -31,12 +37,18 @@ export default function FriendChat({
   unreadCount = 0,
 }: Props) {
   const [messages, setMessages] = useState<WsMessageDTO[]>([]);
-  const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [friendUserId, setFriendUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRemoved, setIsRemoved] = useState(false);
+
+  const inputRef = useRef<string>("");
+  const inputEl = useRef<HTMLInputElement>(null);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    inputRef.current = e.target.value;
+  };
 
   // SEEN
   const [friendLastReadAt, setFriendLastReadAt] = useState<string | null>(null);
@@ -271,30 +283,26 @@ export default function FriendChat({
 
   // Gönder
   const handleSend = useCallback(async () => {
-    if (isRemoved) return;
-
-    const text = input.trim();
-    if (!text) return;
+    const text = inputRef.current.trim();
+    if (!text || isRemoved) return;
 
     try {
-      const msg: ChatMessage = {
+      const sentMessage = await sendMessage({
         from: meEmail,
         to: friendEmail,
         content: text,
-      };
-      await sendMessage(msg);
-      setInput("");
+      });
+
+      inputRef.current = "";
+      if (inputEl.current) inputEl.current.value = "";
+
+      // Scroll en alta
+      const el = listRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
     } catch (e) {
-      console.error("Failed to send message:", e);
-      if (
-        e instanceof Error &&
-        (e.message.includes("not found") || e.message.includes("forbidden"))
-      ) {
-        setIsRemoved(true);
-        onRemoved?.();
-      }
+      console.error(e);
     }
-  }, [input, meEmail, friendEmail, sendMessage, isRemoved, onRemoved]);
+  }, [sendMessage, meEmail, friendEmail, isRemoved]);
 
   // "Seen" olacak mesaj id'si
   const seenMyMessageId = useMemo(() => {
@@ -400,13 +408,92 @@ export default function FriendChat({
     );
   };
 
-  const DaySeparator = ({ label }: { label: string }) => (
-    <div className="w-full flex justify-center my-3">
-      <span className="text-xs px-3 py-2 rounded-full bg-gray-800 text-gray-400 border border-gray-700/30">
-        {label}
-      </span>
-    </div>
-  );
+  const DaySeparator = ({ label }: { label: string }) => {
+    const [scrolling, setScrolling] = useState(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const separatorRef = useRef<HTMLDivElement | null>(null);
+    const [fadeOut, setFadeOut] = useState(false);
+
+    useEffect(() => {
+      const el = listRef.current;
+      if (!el) return;
+
+      const onScroll = () => {
+        setScrolling(true);
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+          setScrolling(false);
+        }, 2000);
+
+        if (separatorRef.current) {
+          const rect = separatorRef.current.getBoundingClientRect();
+          const parentRect = el.getBoundingClientRect();
+          // Eğer separator top ile parent top arası > 20px ve scroll yapılıyorsa fade out
+          if (el.scrollTop > 0 && rect.top - parentRect.top < 20) {
+            setFadeOut(true);
+          } else {
+            setFadeOut(false);
+          }
+        }
+      };
+
+      el.addEventListener("scroll", onScroll, { passive: true });
+      return () => {
+        el.removeEventListener("scroll", onScroll);
+        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      };
+    }, [messages]);
+
+    return (
+      <div
+        ref={separatorRef}
+        className={`w-full flex justify-center py-1 px-3 sticky top-0 z-20 transition-opacity duration-500 ${
+          scrolling || !fadeOut ? "opacity-80" : "opacity-0"
+        }`}
+      >
+        <span className="text-xs px-3 py-2 rounded-full bg-gray-800 text-gray-400 border border-gray-700/30">
+          {label}
+        </span>
+      </div>
+    );
+  };
+
+  const renderList = () => {
+    const groups: React.ReactElement[] = [];
+    let currentDayLabel: string | null = null;
+    let currentMessages: React.ReactElement[] = [];
+
+    for (const it of renderItems) {
+      if (it.type === "sep") {
+        // önceki günü pushla
+        if (currentDayLabel) {
+          groups.push(
+            <div key={currentDayLabel} className="flex flex-col relative">
+              <DaySeparator label={currentDayLabel} />
+              {currentMessages}
+            </div>
+          );
+        }
+        // yeni günü başlat
+        currentDayLabel = it.label;
+        currentMessages = [];
+      } else {
+        currentMessages.push(<Bubble key={it.key} m={it.data} />);
+      }
+    }
+
+    // son grubu da ekle
+    if (currentDayLabel) {
+      groups.push(
+        <div key={currentDayLabel} className="flex flex-col relative">
+          <DaySeparator label={currentDayLabel} />
+          {currentMessages}
+        </div>
+      );
+    }
+
+    return groups;
+  };
 
   // Sadece kırmızı nokta (sayı yok) — unread indikasyonu
   const UnreadDot = ({ show }: { show: boolean }) =>
@@ -493,21 +580,16 @@ export default function FriendChat({
         ) : renderItems.length === 0 ? (
           <div className="text-gray-500">No messages yet.</div>
         ) : (
-          renderItems.map((it) =>
-            it.type === "sep" ? (
-              <DaySeparator key={it.key} label={it.label} />
-            ) : (
-              <Bubble key={it.key} m={it.data} />
-            )
-          )
+          renderList()
         )}
       </div>
 
       {/* input */}
       <div className="flex items-center gap-2 border-t border-gray-800/40 pt-3">
         <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          ref={inputEl}
+          defaultValue={inputRef.current}
+          onChange={handleChange}
           className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none border-none focus:ring-2 border backdrop-blur-sm ${
             isRemoved
               ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed"
