@@ -383,7 +383,7 @@ export default function FriendChat({
                 const currTime = new Date(m.createdAt).getTime();
                 if (
                   prev.senderId === m.senderId &&
-                  currTime - prevTime < 60 * 1000
+                  currTime - prevTime < 5 * 60 * 1000
                 ) {
                   showDetail = false;
                 }
