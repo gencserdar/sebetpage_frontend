@@ -19,7 +19,14 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="relative z-50"
+        onClose={() => {
+          setSelectedFriend(null);
+          onClose();
+        }}
+      >
         <div className="fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">
             {/* Overlay */}
@@ -35,7 +42,7 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
               <div className="absolute inset-0 bg-black/40 transition-opacity" />
             </Transition.Child>
 
-            {/* Drawer (Right) */}
+            {/* Drawer (Top) */}
             <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
               <Transition.Child
                 as={Fragment}
@@ -47,6 +54,7 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
                 leaveTo="translate-x-full"
               >
                 <Dialog.Panel className="w-[350px] h-full bg-gray-950/98 backdrop-blur-xl text-white shadow-2xl border-l border-gray-800/40 flex flex-col">
+                  {" "}
                   {/* Header */}
                   <div className="flex items-center justify-between p-4 border-b border-gray-800/40 bg-gray-900/80">
                     <h2 className="text-lg font-semibold text-gray-100">
@@ -59,7 +67,6 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
                       ✕
                     </button>
                   </div>
-
                   {/* Tabs */}
                   <div className="flex justify-around border-b border-gray-800/40 bg-gray-900/50">
                     {["friends", "suggestions"].map((tab) => (
@@ -76,14 +83,13 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
                       </button>
                     ))}
                   </div>
-
                   {/* Content */}
                   <div className="p-3 overflow-y-auto flex-1 bg-gradient-to-b from-gray-950/60 to-black/80 custom-scrollbar">
                     <style
                       dangerouslySetInnerHTML={{
                         __html: `
                         .custom-scrollbar::-webkit-scrollbar {
-                          width: 6px;
+                          height: 6px;
                         }
                         .custom-scrollbar::-webkit-scrollbar-track {
                           background: rgba(0, 0, 0, 0.4);
@@ -104,7 +110,6 @@ export default function FriendsPanel({ isOpen, onClose }: Props) {
                       <FriendsList onSelectFriend={setSelectedFriend} />
                     )}
                   </div>
-
                   {/* Chat Window */}
                   {selectedFriend && user && (
                     <FriendChat
