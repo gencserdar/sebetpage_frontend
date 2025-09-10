@@ -43,12 +43,13 @@ export default function FriendChat({
   const [loading, setLoading] = useState(true);
   const [isRemoved, setIsRemoved] = useState(false);
 
-  const inputRef = useRef<string>("");
-  const inputEl = useRef<HTMLInputElement>(null);
+  // Add sending state
+  const [isSending, setIsSending] = useState(false);
+  const [inputValue, setInputValue] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    inputRef.current = e.target.value;
-  };
+  const inputEl = useRef<HTMLInputElement>(null);
+  const sendingRef = useRef(false); // Additional ref to prevent race conditions
+  const lastSentMessageRef = useRef<string>(""); // Track last sent message
 
   // SEEN
   const [friendLastReadAt, setFriendLastReadAt] = useState<string | null>(null);
@@ -257,13 +258,16 @@ export default function FriendChat({
     }
   }, [conversationId, nextPage, hasMore, loadingOlder, getPagedMessagesDesc]);
 
+  // Fixed scroll to bottom effect - wait for DOM update
   useEffect(() => {
     if (messages.length > PAGE_SIZE) return; // prevent scroll down on loading older messages
 
-    // scroll down on first load
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    // Use requestAnimationFrame to wait for DOM update
+    requestAnimationFrame(() => {
+      const el = listRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    });
   }, [messages]);
 
   // Scroll listener: tepeye yaklaşınca eski sayfayı çek
@@ -281,28 +285,89 @@ export default function FriendChat({
     };
   }, [hasMore, loadingOlder, loadOlder]);
 
-  // Gönder
+  // Improved send function with proper state management
   const handleSend = useCallback(async () => {
-    const text = inputRef.current.trim();
-    if (!text || isRemoved) return;
+    const text = inputValue.trim();
+    
+    // Prevent sending if already sending, removed, no text, or same as last message
+    if (!text || isRemoved || isSending || sendingRef.current || text === lastSentMessageRef.current) {
+      return;
+    }
+
+    // Set sending state immediately
+    setIsSending(true);
+    sendingRef.current = true;
+    lastSentMessageRef.current = text;
 
     try {
-      const sentMessage = await sendMessage({
+      await sendMessage({
         from: meEmail,
         to: friendEmail,
         content: text,
       });
 
-      inputRef.current = "";
-      if (inputEl.current) inputEl.current.value = "";
-
-      // Scroll en alta
+      // Clear input only after successful send
+      setInputValue("");
+      
+      // Scroll to bottom after DOM update using MutationObserver
       const el = listRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) {
+        const observer = new MutationObserver(() => {
+          setTimeout(() => {
+            const lastMessageEl = el.querySelector('[data-message-id]:last-of-type');
+            if (lastMessageEl) {
+              lastMessageEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            } else {
+              el.scrollTop = el.scrollHeight + 1000;
+            }
+            observer.disconnect(); // Stop observing after first scroll
+          }, 5);
+        });
+
+        observer.observe(el, {
+          childList: true,
+          subtree: true,
+        });
+
+        // Fallback timeout in case observer doesn't fire
+        setTimeout(() => {
+          observer.disconnect();
+          const lastMessageEl = el.querySelector('[data-message-id]:last-of-type');
+          if (lastMessageEl) {
+            lastMessageEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          } else {
+            el.scrollTop = el.scrollHeight + 1000;
+          }
+        }, 50);
+      }
     } catch (e) {
-      console.error(e);
+      console.error("Failed to send message:", e);
+      // Reset last sent message on error so user can retry
+      lastSentMessageRef.current = "";
+    } finally {
+      // Reset sending state
+      setIsSending(false);
+      sendingRef.current = false;
+      
+      // Clear last sent message after a short delay to prevent immediate duplicates
+      setTimeout(() => {
+        lastSentMessageRef.current = "";
+      }, 1000);
     }
-  }, [sendMessage, meEmail, friendEmail, isRemoved]);
+  }, [sendMessage, meEmail, friendEmail, isRemoved, inputValue, isSending]);
+
+  // Handle input change
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  }, []);
+
+  // Handle Enter key with debouncing
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault(); // Prevent form submission or other default behavior
+      handleSend();
+    }
+  }, [handleSend]);
 
   // "Seen" olacak mesaj id'si
   const seenMyMessageId = useMemo(() => {
@@ -556,27 +621,26 @@ export default function FriendChat({
         }}
       >
         {loadingOlder && (
-          /*  <div className="text-center text-xs text-gray-500 mb-2">
-            Loading older…
-          </div> */
-          <div
-            style={{
-              margin: "auto",
-              borderColor: "#4F52C1",
-              borderTopColor: "transparent",
-            }}
-            className="w-8 h-8 border-4 rounded-full animate-spin"
-          />
+          <div className="flex justify-center mb-2">
+            <div
+              style={{
+                borderColor: "#4F52C1",
+                borderTopColor: "transparent",
+              }}
+              className="w-8 h-8 border-4 rounded-full animate-spin"
+            />
+          </div>
         )}
         {loading ? (
-          <div
-            style={{
-              margin: "auto",
-              borderColor: "#4F52C1",
-              borderTopColor: "transparent",
-            }}
-            className="w-8 h-8 border-4 rounded-full animate-spin"
-          />
+          <div className="flex justify-center items-center h-full">
+            <div
+              style={{
+                borderColor: "#4F52C1",
+                borderTopColor: "transparent",
+              }}
+              className="w-8 h-8 border-4 rounded-full animate-spin"
+            />
+          </div>
         ) : renderItems.length === 0 ? (
           <div className="text-gray-500">No messages yet.</div>
         ) : (
@@ -588,34 +652,48 @@ export default function FriendChat({
       <div className="flex items-center gap-2 border-t border-gray-800/40 pt-3">
         <input
           ref={inputEl}
-          defaultValue={inputRef.current}
-          onChange={handleChange}
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none border-none focus:ring-2 border backdrop-blur-sm ${
-            isRemoved
+            isRemoved || isSending
               ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed"
               : "bg-gray-800/80 border-gray-750/40 focus:ring-indigo-500/60"
           }`}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder={isRemoved ? "Friendship ended..." : "Type a message…"}
-          disabled={isRemoved}
+          placeholder={
+            isRemoved 
+              ? "Friendship ended..." 
+              : isSending 
+              ? "Sending..." 
+              : "Type a message…"
+          }
+          disabled={isRemoved || isSending}
         />
         <button
           onClick={handleSend}
-          className={`px-3 py-2 rounded-xl transition-colors duration-200 border-none backdrop-blur-sm ${
-            isRemoved || !conversationId
+          className={`px-3 py-2 rounded-xl transition-colors duration-200 border-none backdrop-blur-sm flex items-center justify-center min-w-[60px] ${
+            isRemoved || !conversationId || isSending
               ? "bg-gray-800/50 border-gray-700/40 text-gray-500 cursor-not-allowed"
               : "bg-indigo-500/80 hover:bg-indigo-400/80 border-indigo-400/20 text-white"
           }`}
-          disabled={!conversationId || isRemoved}
+          disabled={!conversationId || isRemoved || isSending}
           title={
             isRemoved
               ? "Friend removed you"
               : !conversationId
               ? "Connecting..."
+              : isSending
+              ? "Sending..."
               : "Send"
           }
         >
-          Send
+          {isSending ? (
+            <div
+              className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+            />
+          ) : (
+            "Send"
+          )}
         </button>
       </div>
     </div>
