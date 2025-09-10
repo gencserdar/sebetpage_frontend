@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "../services/apiService";
+import { removeAccessToken } from "../services/authService"; // ekstra güvence
 import {
   login as loginService,
   logout as logoutService,
@@ -75,9 +76,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await logoutService();
-    setIsAuthenticated(false);
-    setUser(null);
+    try {
+      await logoutService();
+    } finally {
+      // UI'ı kesin olarak çıkış durumuna al
+      setIsAuthenticated(false);
+      setUser(null);
+      removeAccessToken(); // ekstra güvence
+    }
   };
 
   useEffect(() => {

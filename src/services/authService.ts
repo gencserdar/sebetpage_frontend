@@ -15,22 +15,22 @@ export function isLoggedIn(): boolean {
 }
 
 export async function logout() {
-  localStorage.removeItem("token");
-
   try {
+    // her ihtimale karşı önce lokal token'ı sil
+    localStorage.removeItem("token");
+
     const res = await api("/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });
 
+    // Başarısızsa bile throw etme; logla geç
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
+      const txt = await res.text();
+      console.warn("Logout not ok:", txt);
     }
-
-    console.log("Logged out successfully");
   } catch (err) {
-    console.error("Logout failed:", err);
+    console.warn("Logout request failed:", err);
   }
 }
 
