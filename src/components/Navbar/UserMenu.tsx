@@ -29,7 +29,8 @@ export default function UserMenu({ onAuthClick }: UserMenuProps) {
   // Navigate to user's own profile
   const handleProfileClick = () => {
     if (user?.nickname) {
-      navigate(`/profile/${user.nickname}`);
+      // fallbackId so a cross-tab rename still resolves correctly.
+      navigate(`/profile/${user.nickname}`, { state: { fallbackId: user.id } });
     }
     setDropdownOpen(false);
   };

@@ -34,3 +34,15 @@ export const getUserByNickname = async (nickname: string): Promise<UserDTO> => {
 
   return response.json();
 };
+
+// ID ile kullanıcı çekme — stale nickname linki tıklanırsa
+// (örn. liste eski isimle render edildi, sahibi az önce değiştirdi)
+// caller bunu fallback olarak çağırıyor.
+export const getUserById = async (id: number): Promise<UserDTO> => {
+  const response = await api(`/api/user/${id}`);
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("User not found");
+    throw new Error("Failed to fetch user profile");
+  }
+  return response.json();
+};

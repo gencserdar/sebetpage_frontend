@@ -5,9 +5,11 @@ import {
   login as loginService,
   logout as logoutService,
   isLoggedIn,
-  forgotPassword as forgotPasswordService
+  forgotPassword as forgotPasswordService,
+  setAccessToken
 } from "../services/authService";
 import { useAuth } from "./AuthContext";
+import { tearDownChatSocket } from "../hooks/useWebSocket";
 
 export interface UserDTO {
   id: number;
@@ -46,19 +48,48 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const refreshUser = async () => {
+    // Tokens live in memory now (see authService comment), so on a hard
+    // reload `isLoggedIn()` is always false even when the user has a
+    // valid HttpOnly refresh cookie. Try the refresh endpoint up front
+    // to recover a fresh access token; if it succeeds, /api/user/me
+    // works as before. If it fails, the user really is logged out.
     if (!isLoggedIn()) {
-      setUser(null);
-      return;
+      let refreshed = false;
+      try {
+        const r = await fetch("/api/auth/refresh", {
+          method: "POST",
+          credentials: "include",
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const t = data.token || data.accessToken;
+          if (t) {
+            setAccessToken(t);
+            refreshed = true;
+          }
+        }
+      } catch {
+        // Network blip: treat this boot as logged out and avoid a redirect loop.
+      }
+
+      if (!refreshed) {
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
     }
     try {
       const res = await api("/api/user/me");
       if (res.ok) {
         setUser(await res.json());
+        setIsAuthenticated(true);
       } else {
         setUser(null);
+        setIsAuthenticated(false);
       }
     } catch {
       setUser(null);
+      setIsAuthenticated(false);
     }
   };
 
@@ -76,6 +107,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    // Tear the WS down BEFORE the auth call returns. Two reasons:
+    //   1) The STOMP DISCONNECT propagates to the gateway → cancels the
+    //      gRPC subscribe → chat-service's onCancelHandler broadcasts
+    //      offline-presence to all friends. Doing this synchronously in
+    //      logout (rather than waiting for React to re-render with
+    //      user=null and the hook's useEffect to notice) closes the window
+    //      where the user still appears online to friends.
+    //   2) Even if the auth call fails, we still want the socket gone so
+    //      the next user can log in cleanly on the same tab.
+    tearDownChatSocket();
     try {
       await logoutService();
     } finally {

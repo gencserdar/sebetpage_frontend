@@ -1,23 +1,55 @@
-import {api} from "./apiService";
-import { useAuth } from "../context/AuthContext";
+import { api } from "./apiService";
 
-export const getAccessToken = () => localStorage.getItem("token");
+/**
+ * Access tokens live in memory only — never localStorage / sessionStorage.
+ *
+ * Why: anything in localStorage is readable by *any* JavaScript that
+ * executes on the page, including XSS payloads. A 1-minute access token
+ * stolen by XSS is still 1 minute of free reign on the API, and an XSS
+ * that polls every minute keeps the session forever.
+ *
+ * In-memory means the token vanishes on tab close / hard reload, but the
+ * HttpOnly refresh cookie on the backend lets us mint a fresh access token
+ * silently on app boot via /api/auth/refresh. So users still get
+ * "remember me"; XSS just gets nothing useful.
+ */
+let accessToken: string | null = null;
 
-export const setAccessToken = (token: string) =>
-  localStorage.setItem("token", token);
+export const getAccessToken = () => accessToken;
 
-export const removeAccessToken = () =>
-  localStorage.removeItem("token");
+function clearLegacyAccessTokenCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = "jwt-token=; Max-Age=0; Path=/; SameSite=Lax";
+}
 
+export const setAccessToken = (token: string) => {
+  clearLegacyAccessTokenCookie();
+  accessToken = token;
+};
+
+export const removeAccessToken = () => {
+  clearLegacyAccessTokenCookie();
+  accessToken = null;
+};
+
+clearLegacyAccessTokenCookie();
+
+/**
+ * Whether we *currently* hold a token. NOTE: on a fresh page load this is
+ * false even for users with a valid refresh cookie. Callers that need to
+ * know "is this user logged in?" should rely on the user-context bootstrap
+ * (refreshUser → /api/user/me) rather than this flag, since the bootstrap
+ * triggers the refresh cookie → access token exchange.
+ */
 export function isLoggedIn(): boolean {
-  const token = localStorage.getItem("token");
-  return !!token; 
+  return !!accessToken;
 }
 
 export async function logout() {
   try {
-    // her ihtimale karşı önce lokal token'ı sil
-    localStorage.removeItem("token");
+    // Clear the in-memory token first so concurrent requests stop
+    // sending it the moment logout is initiated.
+    removeAccessToken();
 
     const res = await api("/api/auth/logout", {
       method: "POST",
@@ -51,7 +83,7 @@ export async function login(email: string, password: string, rememberMe: boolean
     const token = data.token || data.accessToken;
     if (!token) throw new Error("No token returned");
 
-    localStorage.setItem("token", token);
+    setAccessToken(token);
     
     return true;
   } catch (err) {
@@ -94,7 +126,7 @@ export async function register(
       return true; 
     }
 
-    localStorage.setItem("token", token);
+    setAccessToken(token);
     return true;
   } catch (err) {
     console.error("Register error:", err);
@@ -122,8 +154,10 @@ export async function forgotPassword(email: string): Promise<boolean> {
 
 export async function resetPassword(code: string, newPassword: string): Promise<boolean> {
   try {
-    const res = await api(`/api/auth/reset-password?code=${encodeURIComponent(code)}&newPassword=${encodeURIComponent(newPassword)}`, {
-      method: "POST"
+    const res = await api(`/api/auth/reset-password?code=${encodeURIComponent(code)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword })
     });
 
     if (!res.ok) {

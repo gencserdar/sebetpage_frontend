@@ -1,37 +1,26 @@
 // src/services/ChatApiService.ts
+//
+// Routes requests through the shared `api()` wrapper so this client inherits
+// the 401-refresh-retry behavior instead of hand-rolling a Bearer header.
+
+import { api } from "./apiService";
+
 class ChatApiService {
-  private baseUrl = '/api/chat';
-  
-  private getHeaders() {
-    return {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'application/json'
-    };
-  }
+  private baseUrl = "/api/chat";
 
   async markAsRead(conversationId: number) {
-    const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/mark-read`, {
-      method: 'POST',
-      headers: this.getHeaders()
+    const res = await api(`${this.baseUrl}/conversations/${conversationId}/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
     });
-    
-    if (!response.ok) {
-      throw new Error('Failed to mark as read');
-    }
-    
-    return response.json();
+    if (!res.ok) throw new Error("Failed to mark as read");
+    return res.json();
   }
 
   async getUnreadCounts() {
-    const response = await fetch(`${this.baseUrl}/unread-counts`, {
-      headers: this.getHeaders()
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to get unread counts');
-    }
-    
-    return response.json();
+    const res = await api(`${this.baseUrl}/unread-counts`);
+    if (!res.ok) throw new Error("Failed to get unread counts");
+    return res.json();
   }
 }
 

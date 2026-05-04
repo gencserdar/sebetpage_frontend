@@ -13,58 +13,53 @@ async function ensureOk(res: Response) {
 
 /* ---------- send / respond / cancel ---------- */
 
-// İstek gönder - now returns response with status and requestId
+// Routes updated for the new gateway: the FriendRequestController is mounted
+// at /api/friend-requests (plural), send takes ?toNickname= query param, and
+// respond/cancel are keyed by {id} path param.
+
 export async function sendFriendRequest(nickname: string): Promise<{ status: string; requestId?: number }> {
-  const res = await api(`/api/friend-request/send/${encodeURIComponent(nickname)}`, {
+  const res = await api(`/api/friend-requests/send?toNickname=${encodeURIComponent(nickname)}`, {
     method: "POST",
   });
   await ensureOk(res);
-  return res.json(); // Returns { status: "sent", requestId: number } or { status: "friends" }
+  return res.json();
 }
 
-// İstek yanıtla
 export async function respondToRequest(id: number, accept: boolean): Promise<void> {
-  const qs = new URLSearchParams({ requestId: String(id), accept: String(accept) });
-  const res = await api(`/api/friend-request/respond?${qs.toString()}`, { method: "POST" });
+  const res = await api(`/api/friend-requests/${id}/respond?accept=${accept}`, { method: "POST" });
   await ensureOk(res);
 }
 
-// Giden isteği iptal et (ID ile)
 export async function cancelOutgoingRequest(requestId: number): Promise<void> {
-  const res = await api(`/api/friend-request/cancel/${requestId}`, { method: "DELETE" });
+  const res = await api(`/api/friend-requests/${requestId}/cancel`, { method: "DELETE" });
   await ensureOk(res);
 }
 
 /* ---------- lists / status / friends ---------- */
 
-// Gelen istekler
 export async function getIncomingRequests(): Promise<FriendRequest[]> {
-  const res = await api("/api/friend-request/incoming");
+  const res = await api("/api/friend-requests/incoming");
   await ensureOk(res);
   return res.json();
 }
 
-// Giden istekler
 export async function getOutgoingRequests(): Promise<FriendRequest[]> {
-  const res = await api("/api/friend-request/outgoing");
+  const res = await api("/api/friend-requests/outgoing");
   await ensureOk(res);
   return res.json();
 }
 
-// Arkadaşlık durumu (received | sent | friends | none)
 export async function getFriendStatus(nickname: string): Promise<FriendStatusResponse> {
   const res = await api(`/api/friends/status/${encodeURIComponent(nickname)}`);
   await ensureOk(res);
   return res.json();
 }
 
-// Arkadaş sil
 export async function removeFriend(userId: number): Promise<void> {
   const res = await api(`/api/friends/remove/${userId}`, { method: "DELETE" });
   await ensureOk(res);
 }
 
-// Arkadaş listesi
 export async function getFriends(): Promise<UserDTO[]> {
   const res = await api("/api/friends");
   await ensureOk(res);

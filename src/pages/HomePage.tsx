@@ -6,10 +6,11 @@ import AuthPopup from "../components/Login/AuthPopup";
 import ProfilePopup from "../components/ProfilePopup";
 import Navbar from "../components/Navbar/Navbar";
 import { useUser } from "../context/UserContext";
-import { getUserByNickname } from "../services/userService";
+import { getUserByNickname, getUserById } from "../services/userService";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
 import FriendChat from "../components/FriendsPanel/FriendChat";
+import { useChatSocket } from "../hooks/useWebSocket";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -24,6 +25,44 @@ export default function HomePage() {
   const [profileLoading, setProfileLoading] = useState(false);
 
   const [showFriendsPanel, setShowFriendsPanel] = useState(false);
+  const [unreadTotal, setUnreadTotal] = useState(0);
+
+  // Tap into the WS singleton so the Messages button gets a live badge whenever
+  // a message arrives in any conversation, even when the panel is closed.
+  const { subscribeUnreadEvents, subscribeUserUpdates } = useChatSocket(user?.email || "");
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeUnreadEvents((evt) => {
+      setUnreadTotal(evt.totalUnreadCount);
+    });
+    return () => unsub();
+  }, [user, subscribeUnreadEvents]);
+
+  // Real-time entity sync — when someone we care about (open profile,
+  // selected chat partner, or ourselves on another tab) updates their
+  // profile fields, patch the local state without re-fetching.
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeUserUpdates((u: any) => {
+      const uid = Number(u.id);
+      // Patch the friend currently in the chat tab so the header / nickname
+      // never go stale.
+      setSelectedFriend(prev => (prev && prev.id === uid ? { ...prev, ...u } : prev));
+      // Patch the open profile popup. Also keep the URL in sync if the
+      // nickname is the one we're routed to — saves the user from a 404 on
+      // refresh after someone else's rename.
+      setProfileUser(prev => {
+        if (!prev || prev.id !== uid) return prev;
+        const next = { ...prev, ...u };
+        if (nickname && prev.nickname === nickname && u.nickname && u.nickname !== nickname) {
+          navigate(`/profile/${u.nickname}`, { replace: true });
+        }
+        return next;
+      });
+    });
+    return () => unsub();
+  }, [user, subscribeUserUpdates, nickname, navigate]);
 
   useEffect(() => {
     if (nickname && location.pathname.startsWith("/profile/")) {
@@ -41,6 +80,25 @@ export default function HomePage() {
       setProfileUser(userData);
       setProfilePopupOpen(true);
     } catch (error) {
+      // Stale-nickname fallback: a list could've been rendered before the
+      // owner renamed themselves, so the click points at a name that no
+      // longer exists. Callers can pass `state.fallbackId` along with the
+      // navigate, and we re-resolve by id and bounce the URL to the right
+      // nickname.
+      const fallbackId: number | undefined = (location.state as any)?.fallbackId;
+      if (fallbackId) {
+        try {
+          const fresh = await getUserById(fallbackId);
+          setProfileUser(fresh);
+          setProfilePopupOpen(true);
+          if (fresh.nickname && fresh.nickname !== userNickname) {
+            navigate(`/profile/${fresh.nickname}`, { replace: true });
+          }
+          return;
+        } catch (e2) {
+          console.error("Profile fallback by id failed:", e2);
+        }
+      }
       console.error("Failed to fetch user profile:", error);
       navigate("/");
     } finally {
@@ -102,6 +160,11 @@ export default function HomePage() {
           >
             <MessageSquare size={20} />
             <span className="font-medium">Messages</span>
+            {unreadTotal > 0 && (
+              <span className="absolute -top-2 -right-2 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                {unreadTotal > 99 ? "99+" : unreadTotal}
+              </span>
+            )}
           </button>
 
           <FriendsPanel
@@ -117,6 +180,7 @@ export default function HomePage() {
             <FriendChat
               meEmail={user.email}
               meNickname={user.nickname}
+              friendUserId={selectedFriend.id}
               friendEmail={selectedFriend.email}
               friendNickname={selectedFriend.nickname}
               onClose={() => setSelectedFriend(null)}

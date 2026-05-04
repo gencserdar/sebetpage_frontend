@@ -4,15 +4,16 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useLayoutEffect,
 } from "react";
 import { useChatSocketContext } from "../../context/ChatSocketContext";
-import { ChatMessage } from "../../types/ChatMessageType";
 import { WsMessageDTO } from "../../types/WSMessageDTO";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
   meEmail: string;
   meNickname: string;
+  friendUserId: number;
   friendEmail: string;
   friendNickname: string;
   onClose: () => void;
@@ -30,6 +31,7 @@ const PAGE_SIZE = 50;
 export default function FriendChat({
   meEmail,
   meNickname,
+  friendUserId,
   friendEmail,
   friendNickname,
   onClose,
@@ -39,7 +41,6 @@ export default function FriendChat({
   const [messages, setMessages] = useState<WsMessageDTO[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [myUserId, setMyUserId] = useState<number | null>(null);
-  const [friendUserId, setFriendUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRemoved, setIsRemoved] = useState(false);
 
@@ -60,6 +61,10 @@ export default function FriendChat({
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const messageEdgesRef = useRef<{ firstKey: string | null; lastKey: string | null }>({
+    firstKey: null,
+    lastKey: null,
+  });
 
   // Use the context instead of direct hook
   const {
@@ -67,7 +72,7 @@ export default function FriendChat({
     getLatestMessagesAsc,
     getPagedMessagesDesc,
     subscribeToConversation,
-    sendMessage,
+    sendToConversation,
     subscribeFriendEvents,
     getReadState,
     markRead,
@@ -128,8 +133,11 @@ export default function FriendChat({
 
   const navigate = useNavigate();
   const openFriendProfile = useCallback(() => {
-    navigate(`/profile/${friendNickname}`);
-  }, [navigate, friendNickname]);
+    // Same stale-nickname guard as SearchBar — pass friendUserId so the
+    // profile resolver can fall back to /api/user/{id} if the displayed
+    // nickname is out of date.
+    navigate(`/profile/${friendNickname}`, { state: { fallbackId: friendUserId } });
+  }, [navigate, friendNickname, friendUserId]);
 
   // En alta scroll + okundu bildir
   useEffect(() => {
@@ -145,19 +153,24 @@ export default function FriendChat({
     let unsub: (() => void) | undefined;
     let friendshipUnsub: (() => void) | undefined;
     let mounted = true;
+    messageEdgesRef.current = { firstKey: null, lastKey: null };
+    setMessages([]);
 
     (async () => {
       try {
         setLoading(true);
-        const r = await resolveDirectConversation(meEmail, friendEmail);
+        const r = await resolveDirectConversation(friendUserId);
         if (!mounted) return;
-        setConversationId(r.conversationId);
-        setMyUserId(r.myUserId);
-        setFriendUserId(r.friendUserId);
+
+        const convId = r.id;
+        const resolvedMyUserId = r.userAId === friendUserId ? r.userBId : r.userAId;
+
+        setConversationId(convId);
+        setMyUserId(resolvedMyUserId);
 
         // READ-STATE: karşı tarafın last_read_at
         try {
-          const rs = await getReadState(r.conversationId);
+          const rs = await getReadState(convId);
           if (mounted) {
             setFriendLastReadAt(rs.friendLastReadAt || null);
           }
@@ -165,18 +178,22 @@ export default function FriendChat({
           console.warn("read-state failed", e);
         }
 
-        const latest = await getLatestMessagesAsc(r.conversationId, PAGE_SIZE);
+        const latest = await getLatestMessagesAsc(convId, PAGE_SIZE);
         if (!mounted) return;
         setMessages(latest);
 
         setNextPage(1);
         setHasMore(latest.length >= PAGE_SIZE);
 
+        // Opening the chat counts as reading it. Without this, the navbar
+        // unread badge stays lit until the window happens to fire `focus`.
+        try { await markRead(convId); } catch { /* non-fatal */ }
+
         // canlı akış (mesaj + READ event)
-        unsub = subscribeToConversation(r.conversationId, (raw: any) => {
+        unsub = subscribeToConversation(convId, (raw: any) => {
           if (raw && raw.type === "READ") {
             // karşı taraf okuduysa güncelle
-            if (Number(raw.readerUserId) === Number(r.friendUserId)) {
+            if (Number(raw.readerUserId) === Number(friendUserId)) {
               setFriendLastReadAt(raw.lastReadAt || null);
             }
             return;
@@ -185,6 +202,11 @@ export default function FriendChat({
           setMessages((prev) =>
             prev.some((x) => x.id === m.id) ? prev : [...prev, m]
           );
+          // Incoming message while the chat is open — mark it read right
+          // away so the unread badge clears instead of waiting for focus.
+          if (Number(m.senderId) !== Number(resolvedMyUserId)) {
+            markRead(convId).catch(() => { /* non-fatal */ });
+          }
         });
 
         // (opsiyonel) friend events
@@ -218,7 +240,7 @@ export default function FriendChat({
       if (friendshipUnsub) friendshipUnsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meEmail, friendEmail]);
+  }, [meEmail, friendUserId]);
 
   // Eski sayfayı yükle (tepedeyken)
   const loadOlder = useCallback(async () => {
@@ -258,17 +280,42 @@ export default function FriendChat({
     }
   }, [conversationId, nextPage, hasMore, loadingOlder, getPagedMessagesDesc]);
 
-  // Fixed scroll to bottom effect - wait for DOM update
-  useEffect(() => {
-    if (messages.length > PAGE_SIZE) return; // prevent scroll down on loading older messages
+  // Pin the chat to the newest message on initial open and on every new
+  // incoming/outgoing frame. We depend on `loading` too because the messages
+  // are only painted into the DOM once the spinner is gone — without that
+  // dependency the very first scrollTop assignment hits a 0-height container
+  // and the chat stays stuck at the top.
+  useLayoutEffect(() => {
+    if (loading) return;
 
-    // Use requestAnimationFrame to wait for DOM update
-    requestAnimationFrame(() => {
+    const first = messages[0];
+    const last = messages[messages.length - 1];
+    const firstKey = first ? `${first.id}-${first.createdAt}` : null;
+    const lastKey = last ? `${last.id}-${last.createdAt}` : null;
+    const previous = messageEdgesRef.current;
+
+    messageEdgesRef.current = { firstKey, lastKey };
+
+    if (!messages.length) return;
+
+    const initialPaint = previous.firstKey === null && previous.lastKey === null;
+    const appendedNewest =
+      previous.lastKey !== null &&
+      previous.lastKey !== lastKey &&
+      previous.firstKey === firstKey;
+
+    if (!initialPaint && !appendedNewest) return;
+
+    const stickToBottom = () => {
       const el = listRef.current;
       if (!el) return;
       el.scrollTop = el.scrollHeight;
+    };
+    requestAnimationFrame(() => {
+      stickToBottom();
+      requestAnimationFrame(stickToBottom);
     });
-  }, [messages]);
+  }, [messages, loading]);
 
   // Scroll listener: tepeye yaklaşınca eski sayfayı çek
   useEffect(() => {
@@ -288,9 +335,13 @@ export default function FriendChat({
   // Improved send function with proper state management
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
-    
+
     // Prevent sending if already sending, removed, no text, or same as last message
     if (!text || isRemoved || isSending || sendingRef.current || text === lastSentMessageRef.current) {
+      return;
+    }
+    if (!conversationId || !myUserId) {
+      console.warn("Chat not ready yet — conversationId/myUserId missing");
       return;
     }
 
@@ -300,46 +351,10 @@ export default function FriendChat({
     lastSentMessageRef.current = text;
 
     try {
-      await sendMessage({
-        from: meEmail,
-        to: friendEmail,
-        content: text,
-      });
+      sendToConversation(conversationId, myUserId, text);
 
       // Clear input only after successful send
       setInputValue("");
-      
-      // Scroll to bottom after DOM update using MutationObserver
-      const el = listRef.current;
-      if (el) {
-        const observer = new MutationObserver(() => {
-          setTimeout(() => {
-            const lastMessageEl = el.querySelector('[data-message-id]:last-of-type');
-            if (lastMessageEl) {
-              lastMessageEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            } else {
-              el.scrollTop = el.scrollHeight + 1000;
-            }
-            observer.disconnect(); // Stop observing after first scroll
-          }, 5);
-        });
-
-        observer.observe(el, {
-          childList: true,
-          subtree: true,
-        });
-
-        // Fallback timeout in case observer doesn't fire
-        setTimeout(() => {
-          observer.disconnect();
-          const lastMessageEl = el.querySelector('[data-message-id]:last-of-type');
-          if (lastMessageEl) {
-            lastMessageEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          } else {
-            el.scrollTop = el.scrollHeight + 1000;
-          }
-        }, 50);
-      }
     } catch (e) {
       console.error("Failed to send message:", e);
       // Reset last sent message on error so user can retry
@@ -354,7 +369,7 @@ export default function FriendChat({
         lastSentMessageRef.current = "";
       }, 1000);
     }
-  }, [sendMessage, meEmail, friendEmail, isRemoved, inputValue, isSending]);
+  }, [sendToConversation, conversationId, myUserId, isRemoved, inputValue, isSending]);
 
   // Handle input change
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -655,6 +670,10 @@ export default function FriendChat({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          type="text"
+          name="chat-message"
+          autoComplete="off"
+          spellCheck={false}
           className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none border-none focus:ring-2 border backdrop-blur-sm ${
             isRemoved || isSending
               ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed"

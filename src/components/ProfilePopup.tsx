@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Edit3, Camera, Check, X, UserMinus, Shield, ShieldOff } from "lucide-react";
-import { 
-  uploadPhoto, 
-  updateEmail, 
-  updateNameSurname, 
+import {
+  uploadPhoto,
+  requestEmailChange,
+  confirmEmailChange,
+  updateNameSurname,
   updateNickname,
-  changePassword,
+  requestPasswordChange,
+  confirmPasswordChange,
   FieldUpdateResponse,
 } from "../services/profileService";
 import { useUser } from "../context/UserContext";
@@ -39,6 +41,14 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const [updatedFields, setUpdatedFields] = useState<Set<string>>(new Set());
   const [localUser, setLocalUser] = useState<UserDTO>(user);
 
+  // Keep localUser in sync with the parent's `user` prop. After a rename or a
+  // verified email change the parent re-fetches the profile and passes us a
+  // fresh row; without this sync the popup would still show whatever we
+  // optimistically wrote into localUser at submit time.
+  useEffect(() => {
+    setLocalUser(user);
+  }, [user]);
+
   // Store original values when editing starts (excluding password)
   const originalValues = useRef<Partial<Pick<UserDTO, UserEditableField>>>({});
 
@@ -52,6 +62,20 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { nickname } = useParams<{ nickname: string }>();
+  const navigate = useNavigate();
+
+  // Two-step verification state. While `verify` is set, an OTP modal is shown
+  // and the underlying field-edit form is hidden behind it. The kind decides
+  // which confirm endpoint we hit on submit; pendingNewEmail is just for
+  // display ("we sent a code to ...").
+  const [verify, setVerify] = useState<
+    | { kind: "email"; pendingNewEmail: string }
+    | { kind: "password" }
+    | null
+  >(null);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifySending, setVerifySending] = useState(false);
   const [friendStatus, setFriendStatus] = useState<
     "self" | "friends" | "sent" | "received" | "none"
   >("none");
@@ -193,10 +217,15 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
       if (field === "email") {
         const emailValue = tempValues.email || localUser.email;
-        response = await updateEmail(emailValue);
-        const newEmail = (response as FieldUpdateResponse).value;
-        setUser((prev) => (prev ? { ...prev, email: newEmail } : prev));
-        setLocalUser((prev) => ({ ...prev, email: newEmail }));
+        // Don't touch local state — server will send a code to the NEW
+        // address; the actual swap happens after the user types it back.
+        await requestEmailChange(emailValue);
+        setVerify({ kind: "email", pendingNewEmail: emailValue });
+        setVerifyCode("");
+        setVerifyError(null);
+        setEditField(null);
+        setLoading(false);
+        return;
       } else if (field === "name" || field === "surname") {
         const nameValue = tempValues.name || localUser.name;
         const surnameValue = tempValues.surname || localUser.surname;
@@ -212,10 +241,17 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
         });
       } else if (field === "nickname") {
         const nicknameValue = tempValues.nickname || localUser.nickname;
+        const oldNickname = localUser.nickname;
         response = await updateNickname(nicknameValue);
         const newNickname = (response as FieldUpdateResponse).value;
         setUser((prev) => (prev ? { ...prev, nickname: newNickname } : prev));
         setLocalUser((prev) => ({ ...prev, nickname: newNickname }));
+        // Profile URL was keyed on the old nickname; swap it so a refresh or
+        // a follow-up navigation doesn't 404 against a name the server no
+        // longer has.
+        if (oldNickname !== newNickname && nickname === oldNickname) {
+          navigate(`/profile/${newNickname}`, { replace: true });
+        }
       }
 
       // Clear original value and temp value since update was successful
@@ -266,11 +302,13 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
     setLoading(true);
     setError((prev) => ({ ...prev, password: null }));
     try {
-      await changePassword(currentPassword, newPassword);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      triggerHighlight("password");
+      // Server validates the current password, queues the new hash, and
+      // emails a code to the current address. We pop the OTP modal — the
+      // password isn't actually rotated until the code comes back.
+      await requestPasswordChange(currentPassword, newPassword);
+      setVerify({ kind: "password" });
+      setVerifyCode("");
+      setVerifyError(null);
       setEditField(null);
     } catch (err) {
       const errorMessage =
@@ -278,6 +316,52 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
       setError((prev) => ({ ...prev, password: errorMessage }));
     }
     setLoading(false);
+  };
+
+  // Submit the OTP for whichever change is pending and apply local state.
+  const handleVerifySubmit = async () => {
+    if (!verify) return;
+    const code = verifyCode.trim();
+    if (code.length !== 6) {
+      setVerifyError("Enter the 6-digit code from your email");
+      return;
+    }
+    setVerifySending(true);
+    setVerifyError(null);
+    try {
+      if (verify.kind === "email") {
+        const r = await confirmEmailChange(code);
+        const newEmail = r.value;
+        setUser((prev) => (prev ? { ...prev, email: newEmail } : prev));
+        setLocalUser((prev) => ({ ...prev, email: newEmail }));
+        triggerHighlight("email");
+      } else {
+        await confirmPasswordChange(code);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        triggerHighlight("password");
+      }
+      setVerify(null);
+      setVerifyCode("");
+      // Clean up tempValues for email so the field reverts to the saved value
+      // if the user reopens the editor.
+      setTempValues((prev) => {
+        const next = { ...prev };
+        delete next.email;
+        return next;
+      });
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setVerifySending(false);
+    }
+  };
+
+  const handleVerifyCancel = () => {
+    setVerify(null);
+    setVerifyCode("");
+    setVerifyError(null);
   };
 
   // Enhanced onClose that clears temp values
@@ -386,7 +470,36 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   };
 
   const renderPasswordForm = () => (
-    <div className="space-y-6">
+    // Wrap the inputs in a <form> with autoComplete="off" so Chrome doesn't
+    // treat the popup as a login form and start scattering the saved email
+    // into nearby <input>s (the "search bar gets autofilled" bug). The
+    // off-screen decoy username + password fields below absorb whichever
+    // autofill Chrome insists on dispensing — empty values land there
+    // instead of into our real fields.
+    <form
+      className="space-y-6"
+      autoComplete="off"
+      onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
+    >
+      {/* autofill decoys — must come before real fields, must not be
+          display:none (Chrome ignores those) */}
+      <input
+        type="text"
+        name="username"
+        autoComplete="username"
+        tabIndex={-1}
+        aria-hidden
+        style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+      />
+      <input
+        type="password"
+        name="password"
+        autoComplete="current-password"
+        tabIndex={-1}
+        aria-hidden
+        style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+      />
+
       <div className="space-y-4">
         <input
           type="password"
@@ -394,6 +507,8 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && cancelEditing("password")}
+          autoComplete="new-password"
+          name="profile-current-password"
           className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
         />
         <input
@@ -402,6 +517,8 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && cancelEditing("password")}
+          autoComplete="new-password"
+          name="profile-new-password"
           className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
         />
         <input
@@ -416,6 +533,8 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
               cancelEditing("password");
             }
           }}
+          autoComplete="new-password"
+          name="profile-confirm-password"
           className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
         />
       </div>
@@ -426,7 +545,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
 
       <div className="flex gap-3">
         <button
-          onClick={handlePasswordSubmit}
+          type="submit"
           className="flex-1 bg-indigo-500/80 hover:bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
           disabled={loading}
         >
@@ -437,6 +556,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           )}
         </button>
         <button
+          type="button"
           onClick={() => cancelEditing("password")}
           className="bg-white/10 hover:bg-white/20 p-3 rounded-lg text-white transition-all duration-200 backdrop-blur-sm"
           disabled={loading}
@@ -444,7 +564,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           <X size={16} />
         </button>
       </div>
-    </div>
+    </form>
   );
 
   const handleAddFriend = async () => {
@@ -731,7 +851,7 @@ const handleToggleBlock = async () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
       <div
         className={`bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl h-[740px] flex overflow-hidden border border-white/20 transition-all duration-300
         ${
@@ -980,8 +1100,60 @@ const handleToggleBlock = async () => {
                 }`}
               >
                 {confirmationModal.type === 'removeFriend' ? 'Remove' : 
-                 confirmationModal.type === 'block' ? 'Block' : 
+                 confirmationModal.type === 'block' ? 'Block' :
                  confirmationModal.type === 'unblock' ? 'Unblock' : 'Cancel Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OTP verification overlay — shown after a request-* call. The actual
+          field stays unchanged on the profile until the code is confirmed. */}
+      {verify && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-white text-lg font-semibold mb-2">
+              {verify.kind === "email" ? "Confirm new email" : "Confirm password change"}
+            </h3>
+            <p className="text-gray-400 text-sm mb-5">
+              {verify.kind === "email"
+                ? <>We sent a 6-digit code to <span className="text-white">{verify.pendingNewEmail}</span>. Enter it below to apply the change.</>
+                : <>We sent a 6-digit code to your current email. Enter it below to apply the new password.</>}
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              autoComplete="one-time-code"
+              value={verifyCode}
+              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleVerifySubmit();
+                if (e.key === "Escape") handleVerifyCancel();
+              }}
+              placeholder="123456"
+              className="bg-white/10 text-white text-center tracking-[0.4em] text-xl rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none mb-3"
+              autoFocus
+            />
+            {verifyError && (
+              <p className="text-red-400 text-sm mb-3">{verifyError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleVerifySubmit}
+                disabled={verifySending || verifyCode.length !== 6}
+                className="flex-1 bg-indigo-500/80 hover:bg-indigo-500 disabled:opacity-50 p-3 rounded-lg text-white font-medium"
+              >
+                {verifySending ? "Verifying..." : "Confirm"}
+              </button>
+              <button
+                onClick={handleVerifyCancel}
+                disabled={verifySending}
+                className="bg-white/10 hover:bg-white/20 px-4 rounded-lg text-white"
+              >
+                Cancel
               </button>
             </div>
           </div>

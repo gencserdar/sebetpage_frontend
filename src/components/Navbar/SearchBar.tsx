@@ -69,7 +69,9 @@ export default function SearchBar() {
 
   const handleResultClick = (result: SearchResult) => {
     if (result.type === 'USER') {
-      navigate(`/profile/${result.nickname}`);
+      // Pass the id so HomePage can fall back if the nickname went stale
+      // between when the search rendered and when the user clicked.
+      navigate(`/profile/${result.nickname}`, { state: { fallbackId: result.id } });
     } else {
       // Navigate to group page normally
       navigate(`/group/${result.id}`);
@@ -198,7 +200,10 @@ export default function SearchBar() {
         </svg>
         <input
           ref={searchInputRef}
-          type="text"
+          type="search"
+          name="navbar-search"
+          autoComplete="off"
+          spellCheck={false}
           placeholder="Search users and groups..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

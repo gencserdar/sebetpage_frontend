@@ -202,9 +202,11 @@ export default function FriendRequestsDropdown() {
   };
 
   // Handle clicking on a friend request user info to open their profile
-  const handleRequestUserClick = (userNickname: string) => {
+  const handleRequestUserClick = (userNickname: string, userId: number) => {
     setShowRequestDropdown(false); // Close the dropdown
-    navigate(`/profile/${userNickname}`); // Navigate to their profile
+    // Stale-nickname guard: pass the id so the profile resolver can fall
+    // back if the requester renamed themselves between fetch and click.
+    navigate(`/profile/${userNickname}`, { state: { fallbackId: userId } });
   };
 
   // Only render if user is logged in
@@ -247,7 +249,7 @@ export default function FriendRequestsDropdown() {
                 >
                   {/* User info section - now clickable */}
                   <button
-                    onClick={() => handleRequestUserClick(req.fromUser.nickname)}
+                    onClick={() => handleRequestUserClick(req.fromUser.nickname, req.fromUser.id)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity text-left flex-1"
                   >
                     <img
