@@ -1,5 +1,5 @@
 // src/hooks/useChatSocket.ts
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { api } from "../services/apiService";
@@ -73,6 +73,15 @@ const unreadByConversation: Map<number, number> = new Map();
 // attributed to the previous principal server-side.
 let activePrincipal: string | null = null;
 let nextWsTicket: string | null = null;
+
+// Reactive connection state. Module-level so multiple hook instances share
+// the same truth. Each mounted hook registers a setState dispatcher here;
+// notifyConnectionState() fans out to all of them so React re-renders
+// components that depend on isConnected when the socket opens or drops.
+const connectionListeners: Set<(connected: boolean) => void> = new Set();
+function notifyConnectionState(connected: boolean) {
+  connectionListeners.forEach((cb) => { try { cb(connected); } catch {} });
+}
 
 async function fetchWsTicket(): Promise<string> {
   const response = await api("/api/ws-ticket", { method: "POST" });
@@ -162,6 +171,18 @@ function tearDownSocket() {
 export function useChatSocket(principalEmail: string) {
   const connectedOnceRef = useRef(false);
 
+  // Reactive connection state — updated by notifyConnectionState() which is
+  // called from the STOMP lifecycle callbacks (onConnect / onDisconnect /
+  // onStompError / onWebSocketError). Using useState so React re-renders
+  // consumers whenever the socket opens or drops, instead of serving a stale
+  // snapshot captured at hook render time.
+  const [isConnected, setIsConnected] = useState(() => sharedClient?.connected ?? false);
+
+  useEffect(() => {
+    connectionListeners.add(setIsConnected);
+    return () => { connectionListeners.delete(setIsConnected); };
+  }, []);
+
   useEffect(() => {
     // Logout: principalEmail empty. Tear the previous socket down so it
     // doesn't keep the old user's session attached when someone else logs
@@ -214,6 +235,7 @@ export function useChatSocket(principalEmail: string) {
         
         onConnect: () => {
           console.log("WebSocket connected for:", principalEmail);
+          notifyConnectionState(true);
           
           // Subscribe to friends queue for presence and friend events
           if (!friendSub) {
@@ -341,14 +363,17 @@ export function useChatSocket(principalEmail: string) {
         
         onStompError: (frame) => {
           console.error("STOMP Broker error:", frame.headers["message"], frame.body);
+          notifyConnectionState(false);
         },
-        
+
         onWebSocketError: (error) => {
           console.error("WebSocket error:", error);
+          notifyConnectionState(false);
         },
-        
+
         onDisconnect: () => {
           console.log("WebSocket disconnected");
+          notifyConnectionState(false);
         }
       });
 
@@ -639,7 +664,8 @@ export function useChatSocket(principalEmail: string) {
     // Utility
     disconnect,
     
-    // Connection state
-    isConnected: sharedClient?.connected || false,
+    // Connection state — reactive useState, updated via notifyConnectionState()
+    // in the STOMP lifecycle callbacks. Components re-render on connect/disconnect.
+    isConnected,
   };
 }
