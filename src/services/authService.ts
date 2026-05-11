@@ -1,4 +1,4 @@
-import { api } from "./apiService";
+import { api, scheduleProactiveRefresh, cancelProactiveRefresh } from "./apiService";
 
 /**
  * Access tokens live in memory only — never localStorage / sessionStorage.
@@ -12,6 +12,9 @@ import { api } from "./apiService";
  * HttpOnly refresh cookie on the backend lets us mint a fresh access token
  * silently on app boot via /api/auth/refresh. So users still get
  * "remember me"; XSS just gets nothing useful.
+ *
+ * The /refresh call on reload is cheap — auth-service serves it from the
+ * Redis session cache, no DB hit needed on a cache hit.
  */
 let accessToken: string | null = null;
 
@@ -25,11 +28,13 @@ function clearLegacyAccessTokenCookie() {
 export const setAccessToken = (token: string) => {
   clearLegacyAccessTokenCookie();
   accessToken = token;
+  scheduleProactiveRefresh(token);
 };
 
 export const removeAccessToken = () => {
   clearLegacyAccessTokenCookie();
   accessToken = null;
+  cancelProactiveRefresh();
 };
 
 clearLegacyAccessTokenCookie();

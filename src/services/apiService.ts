@@ -10,10 +10,38 @@ import { getAccessToken, setAccessToken, removeAccessToken } from "./authService
  *     access token, and retry the original request.
  *  4. If refresh fails, clear the access token and return the original
  *     401/403 so the caller can decide how to present logged-out UI.
+ *
+ * Proactive refresh
+ * -----------------
+ * scheduleProactiveRefresh() is called every time a new access token is stored.
+ * It sets a timer to fire 15 seconds before the token expires so that the
+ * token is silently rotated in the background — no 401 round-trip, no retry,
+ * no visible latency for the user.
+ *
+ * Timeline (access token TTL = 60 s):
+ *   t=0   login / refresh  → token stored, timer set for t=45
+ *   t=45  timer fires      → background /refresh → new token stored, new timer set for t=90
+ *   t=60  old token expires (already replaced at t=45, no impact)
  */
 
 const REFRESH_URL = "/api/auth/refresh";
 let refreshPromise: Promise<string | null> | null = null;
+let proactiveTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+/** Parse the JWT exp claim; returns ms remaining until expiry, or 0. */
+function msUntilExpiry(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (typeof payload.exp !== "number") return 0;
+    return Math.max(0, payload.exp * 1000 - Date.now());
+  } catch {
+    return 0;
+  }
+}
+
+// ─── refresh ────────────────────────────────────────────────────────────────
 
 /** Call /refresh at most once at a time; returns the new access token or null. */
 async function refreshAccessToken(): Promise<string | null> {
@@ -28,18 +56,57 @@ async function refreshAccessToken(): Promise<string | null> {
         const data = await res.json();
         const newToken: string | undefined = data.accessToken ?? data.token;
         if (!newToken) return null;
-        setAccessToken(newToken);
+        setAccessToken(newToken);           // also reschedules proactive refresh
         return newToken;
       } catch {
         return null;
       } finally {
-        // Let the next 401 trigger a fresh /refresh call.
         setTimeout(() => { refreshPromise = null; }, 0);
       }
     })();
   }
   return refreshPromise;
 }
+
+// ─── proactive refresh scheduling ───────────────────────────────────────────
+
+const PROACTIVE_LEAD_MS = 15_000; // refresh 15 s before expiry
+
+/**
+ * Schedule a silent background /refresh call 15 seconds before the token
+ * expires. Call this every time a new access token is stored. If a timer is
+ * already running it is replaced with one for the new token's expiry.
+ *
+ * The self-scheduling chain:
+ *   setAccessToken → scheduleProactiveRefresh → (timer fires) →
+ *   refreshAccessToken → setAccessToken → scheduleProactiveRefresh → …
+ *
+ * This keeps the token perpetually fresh as long as the tab is open and
+ * the user has a valid refresh cookie, with zero 401 round-trips.
+ */
+export function scheduleProactiveRefresh(token: string): void {
+  if (proactiveTimer !== null) {
+    clearTimeout(proactiveTimer);
+    proactiveTimer = null;
+  }
+  const fireIn = msUntilExpiry(token) - PROACTIVE_LEAD_MS;
+  if (fireIn <= 0) return; // token already near expiry — let reactive path handle it
+
+  proactiveTimer = setTimeout(async () => {
+    proactiveTimer = null;
+    await refreshAccessToken();
+  }, fireIn);
+}
+
+/** Cancel the pending proactive refresh (called on logout). */
+export function cancelProactiveRefresh(): void {
+  if (proactiveTimer !== null) {
+    clearTimeout(proactiveTimer);
+    proactiveTimer = null;
+  }
+}
+
+// ─── fetch wrapper ───────────────────────────────────────────────────────────
 
 function buildInit(options: RequestInit, token: string | null): RequestInit {
   return {
@@ -53,25 +120,18 @@ function buildInit(options: RequestInit, token: string | null): RequestInit {
 }
 
 function isAuthEndpoint(url: string): boolean {
-  // Never try to auto-refresh on the auth endpoints themselves; a 401 from
-  // /login means "wrong password", not "expired session".
   return url.includes("/api/auth/");
 }
 
 export const api = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const first = await fetch(url, buildInit(options, getAccessToken()));
-  // Spring Security returns 403 on an empty SecurityContext by default and
-  // 401 only when a custom AuthenticationEntryPoint is configured. Treat
-  // both as "token expired / missing" so the refresh path stays robust
-  // even if a downstream service forgets to wire the entry point.
   const needsRefresh = (first.status === 401 || first.status === 403) && !isAuthEndpoint(url);
   if (!needsRefresh) return first;
 
-  // Token expired / missing — try refresh once, then retry the original.
   const newToken = await refreshAccessToken();
   if (!newToken) {
     removeAccessToken();
-    return first; // caller sees the original 401/403
+    return first;
   }
   return fetch(url, buildInit(options, newToken));
 };
