@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Edit3, Camera, Check, X, UserMinus, Shield, ShieldOff } from "lucide-react";
+import { Edit3, Plus, Check, X, UserMinus, Shield, ShieldOff } from "lucide-react";
 import {
   uploadPhoto,
   requestEmailChange,
@@ -951,12 +951,12 @@ const handleToggleBlock = async () => {
               />
 
               {isOwnProfile && (
-                <label className="absolute bottom-4 right-4 cursor-pointer">
-                  <div className="bg-white/20 hover:bg-white/30 p-3 rounded-full text-white shadow-lg hover:shadow-xl transition-all duration-200 backdrop-blur-sm">
+                <label className="absolute inset-0 cursor-pointer rounded-xl">
+                  <div className="flex h-full w-full items-center justify-center rounded-xl bg-black/0 text-white opacity-0 transition-all duration-200 hover:bg-black/45 hover:opacity-100">
                     {loading ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                     ) : (
-                      <Camera size={18} />
+                      <Plus size={44} />
                     )}
                   </div>
                   <input

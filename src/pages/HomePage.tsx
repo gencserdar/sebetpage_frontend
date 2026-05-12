@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { MessageSquare } from "lucide-react"; // en üstte ekle
 import Modal from "../components/Login/Modal";
@@ -10,7 +10,10 @@ import { getUserByNickname, getUserById } from "../services/userService";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
 import FriendChat from "../components/FriendsPanel/FriendChat";
+import GroupChat from "../components/FriendsPanel/GroupChat";
+import ExpandedMessagesRail from "../components/FriendsPanel/ExpandedMessagesRail";
 import { useChatSocket } from "../hooks/useWebSocket";
+import { MessagingGroup, MessagingGroupDetail } from "../services/chatApiService";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -19,6 +22,11 @@ export default function HomePage() {
   const [open, setOpen] = useState(false);
   const { user } = useUser();
   const [selectedFriend, setSelectedFriend] = useState<UserDTO | null>(null);
+  const [selectedGroup, setSelectedGroupState] = useState<{
+    group: MessagingGroup;
+    participants: { id: number; nickname: string }[];
+  } | null>(null);
+  const [openNextExpanded, setOpenNextExpanded] = useState(false);
 
   const [profilePopupOpen, setProfilePopupOpen] = useState(false);
   const [profileUser, setProfileUser] = useState<UserDTO | null>(null);
@@ -120,6 +128,54 @@ export default function HomePage() {
     setOpen(true);
   };
 
+  const selectFriend = useCallback((friend: UserDTO) => {
+    setOpenNextExpanded(false);
+    setSelectedGroupState(null);
+    setSelectedFriend(friend);
+  }, []);
+
+  const selectGroup = useCallback(
+    (group: MessagingGroup, participants: { id: number; nickname: string }[] = []) => {
+      setOpenNextExpanded(false);
+      setSelectedFriend(null);
+      setSelectedGroupState({ group, participants });
+    },
+    []
+  );
+
+  const handleGroupChanged = useCallback((detail: MessagingGroupDetail) => {
+    setSelectedGroupState((prev) =>
+      prev && prev.group.id === detail.id
+        ? { ...prev, group: { ...prev.group, ...detail } }
+        : prev
+    );
+  }, []);
+
+  const handleGroupDeleted = useCallback((groupId: number) => {
+    setOpenNextExpanded(false);
+    setSelectedGroupState((prev) => (prev?.group.id === groupId ? null : prev));
+  }, []);
+
+  const handleChatExpandedChange = useCallback((expanded: boolean) => {
+    if (expanded) setShowFriendsPanel(false);
+  }, []);
+
+  const expandedRail = user ? (
+    <ExpandedMessagesRail
+      activeGroupId={selectedGroup?.group.id}
+      onSelectFriend={(friend) => {
+        setOpenNextExpanded(true);
+        setSelectedGroupState(null);
+        setSelectedFriend(friend);
+      }}
+      onSelectGroup={(group) => {
+        setOpenNextExpanded(true);
+        setSelectedFriend(null);
+        setSelectedGroupState({ group, participants: [] });
+      }}
+    />
+  ) : null;
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Navbar */}
@@ -173,7 +229,11 @@ export default function HomePage() {
               console.log("closing panel");
               setShowFriendsPanel(false);
             }}
-            setSelectedFriend={setSelectedFriend}
+            setSelectedFriend={selectFriend}
+            setSelectedGroup={selectGroup}
+            activeGroupId={selectedGroup?.group.id}
+            onGroupChanged={handleGroupChanged}
+            onGroupDeleted={handleGroupDeleted}
           />
 
           {user && selectedFriend && (
@@ -183,7 +243,33 @@ export default function HomePage() {
               friendUserId={selectedFriend.id}
               friendEmail={selectedFriend.email}
               friendNickname={selectedFriend.nickname}
-              onClose={() => setSelectedFriend(null)}
+              onClose={() => {
+                setOpenNextExpanded(false);
+                setSelectedFriend(null);
+              }}
+              onGroupCreated={selectGroup}
+              expandedRail={expandedRail}
+              initialExpanded={openNextExpanded}
+              onExpandedChange={handleChatExpandedChange}
+            />
+          )}
+
+          {user && selectedGroup && (
+            <GroupChat
+              conversationId={selectedGroup.group.id}
+              title={selectedGroup.group.title}
+              myUserId={user.id}
+              myNickname={user.nickname}
+              initialParticipants={selectedGroup.participants}
+              onClose={() => {
+                setOpenNextExpanded(false);
+                setSelectedGroupState(null);
+              }}
+              onGroupChanged={handleGroupChanged}
+              onGroupDeleted={handleGroupDeleted}
+              expandedRail={expandedRail}
+              initialExpanded={openNextExpanded}
+              onExpandedChange={handleChatExpandedChange}
             />
           )}
         </>

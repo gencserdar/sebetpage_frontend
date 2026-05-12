@@ -1,9 +1,10 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
+import { Settings, X } from "lucide-react";
 import FriendsList from "./FriendsList";
-import GroupChat from "./GroupChat";
+import GroupSettingsModal from "./GroupSettingsModal";
 import { UserDTO } from "../../types/userDTO";
-import { chatApiService, MessagingGroup } from "../../services/chatApiService";
+import { chatApiService, MessagingGroup, MessagingGroupDetail } from "../../services/chatApiService";
 import { useUser } from "../../context/UserContext";
 import { useChatSocket } from "../../hooks/useWebSocket";
 
@@ -11,89 +12,153 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   setSelectedFriend: (friend: UserDTO) => void;
-}
-
-interface OpenGroup {
-  group: MessagingGroup;
-  participants: { id: number; nickname: string }[];
+  setSelectedGroup: (group: MessagingGroup, participants?: { id: number; nickname: string }[]) => void;
+  activeGroupId?: number | null;
+  onGroupChanged?: (detail: MessagingGroupDetail) => void;
+  onGroupDeleted?: (groupId: number) => void;
 }
 
 export default function FriendsPanel({
   isOpen,
   onClose,
   setSelectedFriend,
+  setSelectedGroup,
+  activeGroupId,
+  onGroupChanged,
+  onGroupDeleted,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"friends" | "groups">("friends");
-  const { user } = useUser();
-  const { subscribeFriendEvents } = useChatSocket(user?.email || "");
-
-  // Messaging groups list
   const [messagingGroups, setMessagingGroups] = useState<MessagingGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [settingsGroupId, setSettingsGroupId] = useState<number | null>(null);
+  const [friendUnread, setFriendUnread] = useState(0);
+  const [groupUnread, setGroupUnread] = useState(0);
+  const [groupUnreadById, setGroupUnreadById] = useState<Map<number, number>>(new Map());
 
-  // Currently open group chat window
-  const [openGroup, setOpenGroup] = useState<OpenGroup | null>(null);
+  const conversationsRef = useRef<any[]>([]);
+  const { user } = useUser();
+  const { subscribeFriendEvents, subscribeUnreadEvents, getConversationUnread } =
+    useChatSocket(user?.email || "");
 
-  const loadGroups = useCallback(async () => {
+  const groupDisplayName = (g: MessagingGroup) =>
+    g.title && g.title.trim() ? g.title.trim() : "Group Chat";
+
+  const recomputeUnread = useCallback(
+    (rows: any[] = conversationsRef.current) => {
+      let directTotal = 0;
+      let groupsTotal = 0;
+      const groupMap = new Map<number, number>();
+
+      rows.forEach((c) => {
+        const id = Number(c?.id);
+        if (!id) return;
+        const count = getConversationUnread(id);
+        if (c?.type === "MESSAGING_GROUP") {
+          groupsTotal += count;
+          if (count > 0) groupMap.set(id, count);
+        } else if (c?.type === "DIRECT") {
+          directTotal += count;
+        }
+      });
+
+      setFriendUnread(directTotal);
+      setGroupUnread(groupsTotal);
+      setGroupUnreadById(groupMap);
+    },
+    [getConversationUnread]
+  );
+
+  const loadConversations = useCallback(async () => {
     setLoadingGroups(true);
     try {
       const all = await chatApiService.getConversations();
+      conversationsRef.current = all;
       setMessagingGroups(
         all
           .filter((c: any) => c.type === "MESSAGING_GROUP")
           .sort((a: any, b: any) => Number(b.createdAtMillis || 0) - Number(a.createdAtMillis || 0))
       );
+      recomputeUnread(all);
     } catch (e) {
-      console.error("Failed to load messaging groups:", e);
+      console.error("Failed to load conversations:", e);
     } finally {
       setLoadingGroups(false);
     }
-  }, []);
+  }, [recomputeUnread]);
 
-  // Reload groups when the tab becomes active or panel opens
   useEffect(() => {
-    if (isOpen && activeTab === "groups") {
-      void loadGroups();
-    }
-  }, [isOpen, activeTab, loadGroups]);
+    if (isOpen) void loadConversations();
+  }, [isOpen, loadConversations]);
+
+  useEffect(() => {
+    if (activeGroupId) setActiveTab("groups");
+  }, [activeGroupId]);
 
   useEffect(() => {
     if (!user) return;
     return subscribeFriendEvents((event: any) => {
-      if (event?.type === "MESSAGING_GROUP_ADDED") {
-        void loadGroups();
+      if (typeof event?.type === "string" && event.type.startsWith("MESSAGING_GROUP_")) {
+        if (event.type === "MESSAGING_GROUP_ADDED") setActiveTab("groups");
+        void loadConversations();
       }
     });
-  }, [user, subscribeFriendEvents, loadGroups]);
+  }, [user, subscribeFriendEvents, loadConversations]);
 
-  /** Called by FriendChat when the user creates a group via the + button. */
+  useEffect(() => {
+    if (!user) return;
+    return subscribeUnreadEvents((event) => {
+      if (!event.conversationId) {
+        recomputeUnread();
+        return;
+      }
+      const known = conversationsRef.current.some((c) => Number(c?.id) === Number(event.conversationId));
+      if (!known) {
+        void loadConversations();
+        return;
+      }
+      recomputeUnread();
+    });
+  }, [user, subscribeUnreadEvents, recomputeUnread, loadConversations]);
+
   const handleGroupCreated = useCallback(
     (group: MessagingGroup, participants: { id: number; nickname: string }[]) => {
-      // Add to the list without a full reload
       setMessagingGroups((prev) =>
         prev.some((g) => g.id === group.id) ? prev : [group, ...prev]
       );
-      // Switch to groups tab and open the new chat
       setActiveTab("groups");
-      setOpenGroup({ group, participants });
+      setSelectedGroup(group, participants);
+      void loadConversations();
     },
-    []
+    [loadConversations, setSelectedGroup]
   );
 
-  // Expose handleGroupCreated so FriendChat can call it via the prop.
-  // The parent component (wherever FriendsPanel is rendered) passes
-  // setSelectedFriend; we inject onGroupCreated into the FriendChat via
-  // the FriendsList → FriendsPanel pipeline. Since FriendChat is rendered
-  // by the parent (not here), we export handleGroupCreated and let the
-  // parent wire it. For now we store it on the window as a lightweight
-  // bridge (no context needed for a single panel instance).
   useEffect(() => {
     (window as any).__friendsPanelGroupCreated = handleGroupCreated;
-    return () => { delete (window as any).__friendsPanelGroupCreated; };
+    return () => {
+      delete (window as any).__friendsPanelGroupCreated;
+    };
   }, [handleGroupCreated]);
 
-  const groupDisplayName = (g: MessagingGroup) =>
-    g.title && g.title.trim() ? g.title.trim() : "Group Chat";
+  const handleGroupChanged = useCallback((detail: MessagingGroupDetail) => {
+    setMessagingGroups((prev) =>
+      prev.map((g) => (g.id === detail.id ? { ...g, ...detail } : g))
+    );
+    onGroupChanged?.(detail);
+  }, [onGroupChanged]);
+
+  const handleGroupDeleted = useCallback((groupId: number) => {
+    setMessagingGroups((prev) => prev.filter((g) => g.id !== groupId));
+    setSettingsGroupId(null);
+    onGroupDeleted?.(groupId);
+    void loadConversations();
+  }, [loadConversations, onGroupDeleted]);
+
+  const Badge = ({ count }: { count: number }) =>
+    count > 0 ? (
+      <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+        {count > 99 ? "99+" : count}
+      </span>
+    ) : null;
 
   return (
     <>
@@ -101,7 +166,6 @@ export default function FriendsPanel({
         <Dialog as="div" className="relative z-50" onClose={() => {}}>
           <div className="fixed inset-0 overflow-hidden">
             <div className="absolute inset-0 overflow-hidden">
-              {/* Overlay */}
               <Transition.Child
                 as={Fragment}
                 enter="ease-in-out duration-300"
@@ -114,7 +178,6 @@ export default function FriendsPanel({
                 <div className="absolute inset-0 bg-black/40 transition-opacity" />
               </Transition.Child>
 
-              {/* Drawer */}
               <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
                 <Transition.Child
                   as={Fragment}
@@ -125,41 +188,48 @@ export default function FriendsPanel({
                   leaveFrom="translate-x-0"
                   leaveTo="translate-x-full"
                 >
-                  <Dialog.Panel className="w-[350px] h-full bg-gray-950/98 backdrop-blur-xl text-white shadow-2xl border-l border-gray-800/40 flex flex-col">
-                    {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-gray-800/40 bg-gray-900/80">
+                  <Dialog.Panel className="flex h-full w-[350px] flex-col border-l border-gray-800/40 bg-gray-950/98 text-white shadow-2xl backdrop-blur-xl">
+                    <div className="flex items-center justify-between border-b border-gray-800/40 bg-gray-900/80 p-4">
                       <h2 className="text-lg font-semibold text-gray-100">Messages</h2>
                       <button
                         onClick={onClose}
-                        className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-gray-800/60 rounded-lg p-1"
+                        className="rounded-lg p-1 text-gray-500 transition-colors duration-200 hover:bg-gray-800/60 hover:text-white"
+                        title="Close"
                       >
-                        ✕
+                        <X className="h-5 w-5" />
                       </button>
                     </div>
 
-                    {/* Tabs */}
                     <div className="flex justify-around border-b border-gray-800/40 bg-gray-900/50">
-                      {["friends", "groups"].map((tab) => (
-                        <button
-                          key={tab}
-                          onClick={() => setActiveTab(tab as any)}
-                          className={`py-3 px-4 transition-all duration-200 text-sm font-medium ${
-                            activeTab === tab
-                              ? "border-b-2 border-indigo-400 text-white bg-gray-900/60"
-                              : "text-gray-500 hover:text-gray-300 hover:bg-gray-900/30"
-                          }`}
-                        >
-                          {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                        </button>
-                      ))}
+                      <button
+                        onClick={() => setActiveTab("friends")}
+                        className={`flex flex-1 items-center justify-center px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                          activeTab === "friends"
+                            ? "border-b-2 border-indigo-400 bg-gray-900/60 text-white"
+                            : "text-gray-500 hover:bg-gray-900/30 hover:text-gray-300"
+                        }`}
+                      >
+                        Friends
+                        <Badge count={friendUnread} />
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("groups")}
+                        className={`flex flex-1 items-center justify-center px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                          activeTab === "groups"
+                            ? "border-b-2 border-indigo-400 bg-gray-900/60 text-white"
+                            : "text-gray-500 hover:bg-gray-900/30 hover:text-gray-300"
+                        }`}
+                      >
+                        Groups
+                        <Badge count={groupUnread} />
+                      </button>
                     </div>
 
-                    {/* Content */}
-                    <div className="p-3 overflow-y-auto flex-1 bg-gradient-to-b from-gray-950/60 to-black/80 custom-scrollbar">
+                    <div className="custom-scrollbar flex-1 overflow-y-auto bg-gradient-to-b from-gray-950/60 to-black/80 p-3">
                       <style
                         dangerouslySetInnerHTML={{
                           __html: `
-                          .custom-scrollbar::-webkit-scrollbar { height: 6px; }
+                          .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
                           .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,.4); border-radius: 10px; }
                           .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,.5); border-radius: 10px; }
                           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.7); }
@@ -174,40 +244,53 @@ export default function FriendsPanel({
                       {activeTab === "groups" && (
                         <div className="flex flex-col gap-2">
                           {loadingGroups ? (
-                            <div className="text-gray-400 text-sm py-4 text-center">
-                              Loading groups…
-                            </div>
+                            <div className="py-4 text-center text-sm text-gray-400">Loading groups...</div>
                           ) : messagingGroups.length === 0 ? (
-                            <div className="text-gray-500 text-sm py-6 text-center">
-                              <p>No group chats yet.</p>
-                            </div>
+                            <div className="py-6 text-center text-sm text-gray-500">No group chats yet.</div>
                           ) : (
-                            messagingGroups.map((g) => (
-                              <button
-                                key={g.id}
-                                onClick={() =>
-                                  setOpenGroup({ group: g, participants: [] })
-                                }
-                                className={`flex items-center gap-3 p-3 rounded-xl border transition-colors text-left ${
-                                  openGroup?.group.id === g.id
-                                    ? "bg-indigo-500/20 border-indigo-500/40"
-                                    : "bg-white/5 hover:bg-white/10 border-transparent"
-                                }`}
-                              >
-                                {/* Avatar placeholder */}
-                                <div className="w-10 h-10 rounded-full bg-indigo-700/60 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white">
-                                  {groupDisplayName(g).charAt(0).toUpperCase()}
+                            messagingGroups.map((g) => {
+                              const unread = groupUnreadById.get(g.id) || 0;
+                              const name = groupDisplayName(g);
+                              return (
+                                <div
+                                  key={g.id}
+                                  className={`flex items-center gap-2 rounded-xl border p-2 transition-colors ${
+                                    activeGroupId === g.id
+                                      ? "border-indigo-500/40 bg-indigo-500/20"
+                                      : "border-transparent bg-white/5 hover:bg-white/10"
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => setSelectedGroup(g, [])}
+                                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                                  >
+                                    {g.imageUrl ? (
+                                      <img
+                                        src={g.imageUrl}
+                                        alt="Group"
+                                        className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-700/60 text-sm font-bold text-white">
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate font-medium text-white">{name}</div>
+                                      <div className="truncate text-xs text-gray-500">Group chat</div>
+                                    </div>
+                                  </button>
+                                  <Badge count={unread} />
+                                  <button
+                                    onClick={() => setSettingsGroupId(g.id)}
+                                    className="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-800/70 hover:text-white"
+                                    title="Group settings"
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </button>
                                 </div>
-                                <div className="min-w-0">
-                                  <div className="text-white font-medium truncate">
-                                    {groupDisplayName(g)}
-                                  </div>
-                                  <div className="text-xs text-gray-500 truncate">
-                                    Group chat
-                                  </div>
-                                </div>
-                              </button>
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       )}
@@ -220,17 +303,13 @@ export default function FriendsPanel({
         </Dialog>
       </Transition.Root>
 
-      {/* Group chat window — rendered outside the drawer so it floats freely */}
-      {openGroup && user && (
-        <GroupChat
-          conversationId={openGroup.group.id}
-          title={groupDisplayName(openGroup.group)}
-          myUserId={user.id}
-          myNickname={user.nickname}
-          initialParticipants={openGroup.participants}
-          onClose={() => setOpenGroup(null)}
-        />
-      )}
+      <GroupSettingsModal
+        groupId={settingsGroupId}
+        open={settingsGroupId !== null}
+        onClose={() => setSettingsGroupId(null)}
+        onChanged={handleGroupChanged}
+        onDeleted={handleGroupDeleted}
+      />
     </>
   );
 }

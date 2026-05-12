@@ -24,6 +24,9 @@ interface Props {
   onRemoved?: () => void;
   unreadCount?: number;
   onMarkAsRead?: (conversationId: number) => void;
+  expandedRail?: React.ReactNode;
+  initialExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
   /** Called after a new messaging group is successfully created from this chat. */
   onGroupCreated?: (
     group: MessagingGroup,
@@ -74,6 +77,9 @@ export default function FriendChat({
   onClose,
   onRemoved,
   unreadCount = 0,
+  expandedRail,
+  initialExpanded = false,
+  onExpandedChange,
   onGroupCreated,
 }: Props) {
   const [messages, setMessages] = useState<WsMessageDTO[]>([]);
@@ -104,7 +110,7 @@ export default function FriendChat({
   });
 
   // ── Expand & Add-to-group state ─────────────────────────────────────────
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [addSearch, setAddSearch] = useState("");
   const [friendsList, setFriendsList] = useState<UserDTO[]>([]);
@@ -123,6 +129,14 @@ export default function FriendChat({
     getReadState,
     markRead,
   } = useChatSocketContext();
+
+  useEffect(() => {
+    setIsExpanded(initialExpanded);
+  }, [friendUserId, initialExpanded]);
+
+  useEffect(() => {
+    onExpandedChange?.(isExpanded);
+  }, [isExpanded, onExpandedChange]);
 
   // ── helpers ────────────────────────────────────────────────────────────
 
@@ -394,6 +408,38 @@ export default function FriendChat({
       requestAnimationFrame(stickToBottom);
     });
   }, [messages, loading]);
+
+  useLayoutEffect(() => {
+    if (!isExpanded || loading) return;
+    const el = listRef.current;
+    if (!el) return;
+
+    const stickToBottom = () => {
+      const node = listRef.current;
+      if (!node) return;
+      node.scrollTop = node.scrollHeight;
+    };
+
+    let raf1 = 0;
+    let raf2 = 0;
+    const timers: number[] = [];
+    const observer = new ResizeObserver(stickToBottom);
+
+    stickToBottom();
+    observer.observe(el);
+    raf1 = requestAnimationFrame(() => {
+      stickToBottom();
+      raf2 = requestAnimationFrame(stickToBottom);
+    });
+    timers.push(window.setTimeout(stickToBottom, 80), window.setTimeout(stickToBottom, 180));
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      timers.forEach((timer) => window.clearTimeout(timer));
+      observer.disconnect();
+    };
+  }, [isExpanded, loading]);
 
   // ── Scroll listener for older pages ───────────────────────────────────
 
@@ -733,7 +779,7 @@ export default function FriendChat({
     <div
       ref={listRef}
       className={`overflow-y-auto mb-3 bg-gradient-to-b from-gray-900/60 to-black/80 p-3 rounded-xl ${
-        expanded ? "flex-1" : "h-80"
+        expanded ? "min-h-0 flex-1" : "h-80"
       }`}
       style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.5) rgba(0,0,0,.4)" }}
     >
@@ -811,18 +857,11 @@ export default function FriendChat({
   if (isExpanded) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-black/90">
-        {/* Left: Chat panel */}
-        <div className="h-1/2 md:h-auto md:w-1/2 flex flex-col bg-gray-950/98 backdrop-blur-xl p-4 border-b md:border-b-0 md:border-r border-gray-800/40 overflow-hidden">
-          {chatHeader}
-          {removedBanner}
-          {chatMessages(true)}
-          {chatInput}
-        </div>
-
-        {/* Right: Mini feed panel */}
+        {expandedRail}
+        {/* Left: Mini feed panel */}
         <div className="h-1/2 md:h-auto md:w-1/2 flex flex-col bg-gray-900/95 backdrop-blur-xl overflow-hidden">
           {/* Mini navbar */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800/40 bg-gray-950/80">
+          <div className="flex items-center justify-between px-5 py-4 pl-16 border-b border-gray-800/40 bg-gray-950/80">
             <span className="text-lg font-bold tracking-wide text-indigo-400 select-none">
               SebetPage
             </span>
@@ -853,6 +892,14 @@ export default function FriendChat({
             <Newspaper className="w-10 h-10 opacity-40" aria-hidden="true" />
             <span className="text-sm">Posts</span>
           </div>
+        </div>
+
+        {/* Right: Chat panel */}
+        <div className="h-1/2 min-h-0 md:h-auto md:w-1/2 flex flex-col bg-gray-950/98 backdrop-blur-xl p-4 border-t md:border-t-0 md:border-l border-gray-800/40 overflow-hidden">
+          {chatHeader}
+          {removedBanner}
+          {chatMessages(true)}
+          {chatInput}
         </div>
       </div>
     );
