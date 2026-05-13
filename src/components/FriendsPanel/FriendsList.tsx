@@ -193,7 +193,7 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
     [friends, onlineIds]
   );
 
-  if (loading) return <div className="text-gray-400">Loading friends...</div>;
+  if (loading && friends.length === 0) return <div className="py-6" />;
   if (friends.length === 0) return <div className="text-gray-400">No friends yet.</div>;
 
   const FriendRow = ({ f, online }: { f: UserDTO; online: boolean }) => {

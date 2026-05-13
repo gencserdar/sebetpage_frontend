@@ -20,7 +20,7 @@ export default function HomePage() {
   const { nickname } = useParams<{ nickname: string }>();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const [selectedFriend, setSelectedFriend] = useState<UserDTO | null>(null);
   const [selectedGroup, setSelectedGroupState] = useState<{
     group: MessagingGroup;
@@ -159,6 +159,23 @@ export default function HomePage() {
   const handleChatExpandedChange = useCallback((expanded: boolean) => {
     if (expanded) setShowFriendsPanel(false);
   }, []);
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col">
+        <div className="transition-all duration-300">
+          <Navbar onAuthClick={handleAuthClick} shiftRight={false} />
+        </div>
+        <main className="flex flex-1 items-center justify-center px-4">
+          <div className="flex w-full max-w-2xl flex-col items-center gap-6">
+            <div className="h-12 w-3/4 max-w-lg rounded-full bg-white/[0.06] animate-pulse" />
+            <div className="h-5 w-1/2 max-w-sm rounded-full bg-white/[0.04] animate-pulse" />
+            <div className="mt-4 h-10 w-36 rounded-full bg-white/[0.05] animate-pulse" />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const expandedRail = user ? (
     <ExpandedMessagesRail

@@ -243,10 +243,12 @@ export default function FriendsPanel({
 
                       {activeTab === "groups" && (
                         <div className="flex flex-col gap-2">
-                          {loadingGroups ? (
-                            <div className="py-4 text-center text-sm text-gray-400">Loading groups...</div>
-                          ) : messagingGroups.length === 0 ? (
-                            <div className="py-6 text-center text-sm text-gray-500">No group chats yet.</div>
+                          {messagingGroups.length === 0 ? (
+                            loadingGroups ? (
+                              <div className="py-6" />
+                            ) : (
+                              <div className="py-6 text-center text-sm text-gray-500">No group chats yet.</div>
+                            )
                           ) : (
                             messagingGroups.map((g) => {
                               const unread = groupUnreadById.get(g.id) || 0;

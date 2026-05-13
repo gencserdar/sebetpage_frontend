@@ -63,12 +63,23 @@ export default function GroupSettingsModal({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [onlineParticipantIds, setOnlineParticipantIds] = useState<Set<number>>(() => new Set());
   const detailRef = useRef<MessagingGroupDetail | null>(null);
+  const editingTitleRef = useRef(false);
+  const editingDescriptionRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingPermissionTimersRef = useRef<Map<number, number>>(new Map());
   const pendingPermissionsRef = useRef<Map<number, MessagingGroupPermissions>>(new Map());
   const permissionSyncingRef = useRef<Set<number>>(new Set());
-  const { subscribeFriendEvents } = useChatSocketContext();
+  const { subscribeFriendEvents, getUserOnlineStatus } = useChatSocketContext();
+
+  useEffect(() => {
+    editingTitleRef.current = editingTitle;
+  }, [editingTitle]);
+
+  useEffect(() => {
+    editingDescriptionRef.current = editingDescription;
+  }, [editingDescription]);
 
   const clearPermissionSync = useCallback(() => {
     pendingPermissionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -96,11 +107,11 @@ export default function GroupSettingsModal({
       detailRef.current = merged;
       setDetail(merged);
       const resetDrafts = options?.resetDrafts ?? true;
-      if (resetDrafts || !editingTitle) setTitleDraft(merged.title || "");
-      if (resetDrafts || !editingDescription) setDescriptionDraft(merged.description || "");
+      if (resetDrafts || !editingTitleRef.current) setTitleDraft(merged.title || "");
+      if (resetDrafts || !editingDescriptionRef.current) setDescriptionDraft(merged.description || "");
       onChanged?.(merged);
     },
-    [editingDescription, editingTitle, onChanged]
+    [onChanged]
   );
 
   const load = useCallback(async (resetUi = true) => {
@@ -156,6 +167,57 @@ export default function GroupSettingsModal({
     });
   }, [groupId, load, onClose, onDeleted, open, subscribeFriendEvents]);
 
+  useEffect(() => {
+    if (!detail) {
+      setOnlineParticipantIds(new Set());
+      return;
+    }
+    const next = new Set<number>();
+    detail.participants.forEach((participant) => {
+      if (getUserOnlineStatus(participant.userId)) next.add(participant.userId);
+    });
+    setOnlineParticipantIds(next);
+  }, [detail, getUserOnlineStatus]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const participantIds = () =>
+      new Set((detailRef.current?.participants || []).map((participant) => participant.userId));
+
+    return subscribeFriendEvents((event: any) => {
+      const type = event?.type;
+      if (type === "PRESENCE_SNAPSHOT" && Array.isArray(event.users)) {
+        const activeParticipantIds = participantIds();
+        const next = new Set<number>();
+        event.users.forEach((entry: any) => {
+          const userId = Number(entry?.userId);
+          if (entry?.online && activeParticipantIds.has(userId)) next.add(userId);
+        });
+        setOnlineParticipantIds(next);
+        return;
+      }
+
+      const userId = Number(event?.userId);
+      if (!Number.isFinite(userId) || !participantIds().has(userId)) return;
+      if (type === "PRESENCE_UPDATE") {
+        setOnlineParticipantIds((prev) => {
+          const next = new Set(prev);
+          if (event.online) next.add(userId);
+          else next.delete(userId);
+          return next;
+        });
+      } else if (type === "FRIEND_ONLINE") {
+        setOnlineParticipantIds((prev) => new Set(prev).add(userId));
+      } else if (type === "FRIEND_OFFLINE") {
+        setOnlineParticipantIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    });
+  }, [open, subscribeFriendEvents]);
+
   if (!open) return null;
 
   const me = detail?.me;
@@ -179,7 +241,7 @@ export default function GroupSettingsModal({
   const displayName = detail?.title?.trim() || "Group chat";
   const initial = displayName.charAt(0).toUpperCase();
   const memberSearchNeedle = memberSearch.trim().toLowerCase();
-  const filteredParticipants = detail
+  const filtered = detail
     ? memberSearchNeedle
       ? detail.participants.filter((participant) => {
           const haystack = [
@@ -196,6 +258,19 @@ export default function GroupSettingsModal({
         })
       : detail.participants
     : [];
+  const selfUserId = detail?.me.userId;
+  const filteredParticipants = filtered
+    .map((participant, index) => ({ participant, index }))
+    .sort((a, b) => {
+      const aSelf = a.participant.userId === selfUserId;
+      const bSelf = b.participant.userId === selfUserId;
+      if (aSelf !== bSelf) return aSelf ? -1 : 1;
+      const aOnline = aSelf || onlineParticipantIds.has(a.participant.userId);
+      const bOnline = bSelf || onlineParticipantIds.has(b.participant.userId);
+      if (aOnline !== bOnline) return aOnline ? -1 : 1;
+      return a.index - b.index;
+    })
+    .map(({ participant }) => participant);
 
   const setPermissionSyncing = (userId: number, syncing: boolean) => {
     const next = new Set(permissionSyncingRef.current);
@@ -442,24 +517,21 @@ export default function GroupSettingsModal({
           className="group-settings-scroll flex-1 overflow-y-auto"
           style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.55) rgba(3,7,18,.75)" }}
         >
-          {loading ? (
-            <div className="flex h-full items-center justify-center text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading
-            </div>
-          ) : detail ? (
-            <div className="pb-5">
+          {detail ? (
+            <div className="relative pb-5">
               <div
-                className="relative h-[230px] overflow-hidden border-b border-gray-800"
+                className="sticky top-0 z-0 aspect-square w-full overflow-hidden border-b border-gray-800"
               >
                 {detail.imageUrl ? (
                   <img
                     src={detail.imageUrl}
                     alt="Group"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover object-top"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-indigo-900/55 text-6xl font-bold">
+                  <div
+                    className="flex h-full w-full items-center justify-center bg-indigo-900/55 text-6xl font-bold"
+                  >
                     {initial}
                   </div>
                 )}
@@ -487,7 +559,8 @@ export default function GroupSettingsModal({
                 />
               </div>
 
-              <div className="border-b border-gray-800 px-4 py-4">
+              <div className="relative z-10 -mt-28 bg-gray-950 pb-5 before:pointer-events-none before:absolute before:bottom-full before:left-0 before:right-0 before:h-28 before:bg-gradient-to-b before:from-transparent before:via-gray-950/70 before:to-gray-950 before:content-['']">
+                <div className="border-b border-gray-800 px-4 py-4">
                 <div className="flex items-center justify-center gap-2">
                   {editingTitle ? (
                     <>
@@ -614,25 +687,41 @@ export default function GroupSettingsModal({
                     ) : filteredParticipants.map((p) => {
                       const admin = isGroupAdmin(p);
                       const self = p.userId === detail.me.userId;
+                      const online = self || onlineParticipantIds.has(p.userId);
                       return (
                         <div
                           key={p.userId}
-                          className="relative flex items-center gap-3 rounded-xl border border-gray-800 bg-white/[0.03] px-3 py-2"
+                          className={`relative flex items-center gap-3 rounded-xl border px-3 py-2 transition ${
+                            online
+                              ? "border-emerald-400/25 bg-emerald-500/10"
+                              : "border-gray-800 bg-white/[0.03]"
+                          }`}
                         >
-                          <img
-                            src={p.profileImageUrl || "/default_pp.png"}
-                            alt="pfp"
-                            className="h-9 w-9 rounded-full object-cover"
-                          />
+                          <div className="relative shrink-0">
+                            <img
+                              src={p.profileImageUrl || "/default_pp.png"}
+                              alt="pfp"
+                              className="h-9 w-9 rounded-full object-cover"
+                            />
+                            <span
+                              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-gray-950 ${
+                                online ? "bg-emerald-400" : "bg-gray-500"
+                              }`}
+                              title={online ? "Online" : "Offline"}
+                            />
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium text-gray-100">
+                            <div className={`truncate text-sm font-medium ${online ? "text-emerald-100" : "text-gray-100"}`}>
                               {p.nickname}
                               {self && <span className="ml-1 text-gray-500">(you)</span>}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {admin ? "Group admin" : p.role || "Member"}
-                            </div>
                           </div>
+
+                          {admin && (
+                            <span className="shrink-0 rounded-full border border-indigo-400/35 bg-indigo-500/15 px-2.5 py-1 text-xs font-semibold text-indigo-100">
+                              Admin
+                            </span>
+                          )}
 
                           {!self && !admin && (
                             <button
@@ -713,6 +802,9 @@ export default function GroupSettingsModal({
                 )}
               </div>
             </div>
+            </div>
+          ) : loading ? (
+            <div className="h-full min-h-[520px]" />
           ) : (
             <div className="py-8 text-center text-gray-500">Group not found.</div>
           )}
