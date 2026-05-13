@@ -4,6 +4,7 @@ import {
   Loader2,
   LogOut,
   Plus,
+  Search,
   Shield,
   Trash2,
   UserMinus,
@@ -16,6 +17,7 @@ import {
   MessagingGroupParticipant,
   MessagingGroupPermissions,
 } from "../../services/chatApiService";
+import { useChatSocketContext } from "../../context/ChatSocketContext";
 
 interface Props {
   groupId: number | null;
@@ -57,28 +59,67 @@ export default function GroupSettingsModal({
   const [titleDraft, setTitleDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [permissionUserId, setPermissionUserId] = useState<number | null>(null);
+  const [permissionSyncingUserIds, setPermissionSyncingUserIds] = useState<Set<number>>(() => new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
-  const [scrollTop, setScrollTop] = useState(0);
+  const [memberSearch, setMemberSearch] = useState("");
+  const detailRef = useRef<MessagingGroupDetail | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingPermissionTimersRef = useRef<Map<number, number>>(new Map());
+  const pendingPermissionsRef = useRef<Map<number, MessagingGroupPermissions>>(new Map());
+  const permissionSyncingRef = useRef<Set<number>>(new Set());
+  const { subscribeFriendEvents } = useChatSocketContext();
 
-  const load = useCallback(async () => {
+  const clearPermissionSync = useCallback(() => {
+    pendingPermissionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    pendingPermissionTimersRef.current.clear();
+    pendingPermissionsRef.current.clear();
+    permissionSyncingRef.current = new Set();
+    setPermissionSyncingUserIds(new Set());
+  }, []);
+
+  const applyDetail = useCallback(
+    (next: MessagingGroupDetail, options?: { resetDrafts?: boolean }) => {
+      let merged = next;
+      if (pendingPermissionsRef.current.size > 0) {
+        const patchOne = (participant: MessagingGroupParticipant): MessagingGroupParticipant => {
+          const pending = pendingPermissionsRef.current.get(participant.userId);
+          return pending ? { ...participant, permissions: pending } : participant;
+        };
+        merged = {
+          ...next,
+          me: patchOne(next.me),
+          participants: next.participants.map(patchOne),
+        };
+      }
+
+      detailRef.current = merged;
+      setDetail(merged);
+      const resetDrafts = options?.resetDrafts ?? true;
+      if (resetDrafts || !editingTitle) setTitleDraft(merged.title || "");
+      if (resetDrafts || !editingDescription) setDescriptionDraft(merged.description || "");
+      onChanged?.(merged);
+    },
+    [editingDescription, editingTitle, onChanged]
+  );
+
+  const load = useCallback(async (resetUi = true) => {
     if (!open || !groupId) return;
-    setLoading(true);
+    if (resetUi) setLoading(true);
     setError(null);
-    setPermissionUserId(null);
-    setScrollTop(0);
+    if (resetUi) {
+      setPermissionUserId(null);
+      setMemberSearch("");
+    }
     try {
       const next = await chatApiService.getMessagingGroup(groupId);
-      setDetail(next);
-      setTitleDraft(next.title || "");
-      setDescriptionDraft(next.description || "");
+      applyDetail(next, { resetDrafts: resetUi });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load group");
     } finally {
-      setLoading(false);
+      if (resetUi) setLoading(false);
     }
-  }, [groupId, open]);
+  }, [applyDetail, groupId, open]);
 
   useEffect(() => {
     void load();
@@ -91,8 +132,29 @@ export default function GroupSettingsModal({
       setEditingTitle(false);
       setEditingDescription(false);
       setPermissionUserId(null);
+      setMemberSearch("");
+      clearPermissionSync();
     }
-  }, [open]);
+  }, [clearPermissionSync, open]);
+
+  useEffect(() => {
+    return clearPermissionSync;
+  }, [clearPermissionSync]);
+
+  useEffect(() => {
+    if (!open || !groupId) return undefined;
+    return subscribeFriendEvents((event: any) => {
+      if (Number(event?.conversationId) !== Number(groupId)) return;
+      if (event?.type === "MESSAGING_GROUP_DELETED" || event?.type === "MESSAGING_GROUP_LEFT") {
+        onDeleted?.(groupId);
+        onClose();
+        return;
+      }
+      if (event?.type === "MESSAGING_GROUP_ADDED" || event?.type === "MESSAGING_GROUP_UPDATED") {
+        void load(false);
+      }
+    });
+  }, [groupId, load, onClose, onDeleted, open, subscribeFriendEvents]);
 
   if (!open) return null;
 
@@ -105,6 +167,10 @@ export default function GroupSettingsModal({
     return meIsAdmin || !!me.permissions?.[permission];
   };
 
+  const isGroupAdmin = (participant: MessagingGroupParticipant) =>
+    !!detail &&
+    (participant.userId === detail.createdById || participant.role?.toUpperCase() === "ADMIN");
+
   const canEditName = canGrant("canChangeName");
   const canEditDescription = canGrant("canChangeDescription");
   const canEditPhoto = canGrant("canChangePhoto");
@@ -112,14 +178,109 @@ export default function GroupSettingsModal({
 
   const displayName = detail?.title?.trim() || "Group chat";
   const initial = displayName.charAt(0).toUpperCase();
-  const heroHeight = Math.max(0, 230 - scrollTop * 0.95);
-  const heroOpacity = Math.min(1, heroHeight / 120);
+  const memberSearchNeedle = memberSearch.trim().toLowerCase();
+  const filteredParticipants = detail
+    ? memberSearchNeedle
+      ? detail.participants.filter((participant) => {
+          const haystack = [
+            participant.nickname,
+            participant.name,
+            participant.surname,
+            participant.role,
+            participant.userId,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(memberSearchNeedle);
+        })
+      : detail.participants
+    : [];
 
-  const applyDetail = (next: MessagingGroupDetail) => {
-    setDetail(next);
-    setTitleDraft(next.title || "");
-    setDescriptionDraft(next.description || "");
-    onChanged?.(next);
+  const setPermissionSyncing = (userId: number, syncing: boolean) => {
+    const next = new Set(permissionSyncingRef.current);
+    if (syncing) next.add(userId);
+    else next.delete(userId);
+    permissionSyncingRef.current = next;
+    setPermissionSyncingUserIds(new Set(next));
+  };
+
+  const patchParticipantLocally = (
+    userId: number,
+    patch: Partial<Pick<MessagingGroupParticipant, "muted" | "permissions">>
+  ) => {
+    const current = detailRef.current;
+    if (!current) return;
+    const patchOne = (participant: MessagingGroupParticipant): MessagingGroupParticipant => {
+      if (participant.userId !== userId) return participant;
+      return {
+        ...participant,
+        muted: patch.muted ?? participant.muted,
+        permissions: patch.permissions ?? participant.permissions,
+      };
+    };
+    applyDetail({
+      ...current,
+      me: current.me.userId === userId ? patchOne(current.me) : current.me,
+      participants: current.participants.map(patchOne),
+    }, { resetDrafts: false });
+  };
+
+  const mergeParticipantDetail = (next: MessagingGroupDetail, userId: number) => {
+    const current = detailRef.current;
+    if (!current) {
+      applyDetail(next, { resetDrafts: false });
+      return;
+    }
+
+    const updatedParticipant = next.participants.find((p) => p.userId === userId);
+    applyDetail({
+      ...current,
+      me: next.me.userId === userId ? next.me : current.me,
+      participants: current.participants.map((p) =>
+        p.userId === userId ? updatedParticipant ?? p : p
+      ),
+      knownParticipants: next.knownParticipants ?? current.knownParticipants,
+    }, { resetDrafts: false });
+  };
+
+  const flushPermissionSave = async (userId: number) => {
+    if (permissionSyncingRef.current.has(userId)) return;
+    const permissions = pendingPermissionsRef.current.get(userId);
+    const current = detailRef.current;
+    if (!current || !permissions) return;
+
+    pendingPermissionsRef.current.delete(userId);
+    setPermissionSyncing(userId, true);
+    setError(null);
+    try {
+      const next = await chatApiService.updateMessagingGroupParticipant(current.id, userId, {
+        permissions,
+      });
+      if (!pendingPermissionsRef.current.has(userId)) {
+        mergeParticipantDetail(next, userId);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update permissions");
+      void load();
+    } finally {
+      setPermissionSyncing(userId, false);
+      if (pendingPermissionsRef.current.has(userId)) {
+        void flushPermissionSave(userId);
+      }
+    }
+  };
+
+  const schedulePermissionSave = (userId: number, permissions: MessagingGroupPermissions) => {
+    pendingPermissionsRef.current.set(userId, permissions);
+    const existing = pendingPermissionTimersRef.current.get(userId);
+    if (existing) window.clearTimeout(existing);
+
+    const timer = window.setTimeout(() => {
+      pendingPermissionTimersRef.current.delete(userId);
+      void flushPermissionSave(userId);
+    }, 220);
+    pendingPermissionTimersRef.current.set(userId, timer);
   };
 
   const saveGroupPatch = async (
@@ -221,6 +382,8 @@ export default function GroupSettingsModal({
   const permissionButton = (participant: MessagingGroupParticipant, row: typeof permissionRows[number]) => {
     const enabled = canGrant(row.key);
     const checked = participant.permissions?.[row.key] ?? false;
+    const syncing = permissionSyncingUserIds.has(participant.userId);
+    const canToggle = enabled && !isGroupAdmin(participant) && (meIsAdmin || !checked);
     const nextPermissions = {
       ...(participant.permissions || emptyPermissions),
       [row.key]: !checked,
@@ -230,20 +393,25 @@ export default function GroupSettingsModal({
       <button
         key={row.key}
         type="button"
-        disabled={!enabled || saving}
-        onClick={() =>
-          updateParticipant(participant, {
-            permissions: nextPermissions as MessagingGroupPermissions,
-          })
-        }
+        disabled={!canToggle || saving}
+        onClick={() => {
+          if (!canToggle) return;
+          const permissions = nextPermissions as MessagingGroupPermissions;
+          patchParticipantLocally(participant.userId, { permissions });
+          schedulePermissionSave(participant.userId, permissions);
+        }}
         className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition ${
           checked
             ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-100"
             : "border-gray-800 bg-white/[0.03] text-gray-300 hover:border-emerald-700/60 hover:bg-emerald-950/45 hover:text-emerald-100"
-        } ${enabled ? "" : "cursor-not-allowed opacity-45"}`}
+        } ${canToggle && !saving ? "" : "cursor-not-allowed opacity-45"}`}
       >
         <span>{row.label}</span>
-        {checked && <Check className="h-4 w-4 text-emerald-300" />}
+        {syncing ? (
+          <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />
+        ) : (
+          checked && <Check className="h-4 w-4 text-emerald-300" />
+        )}
       </button>
     );
   };
@@ -272,7 +440,6 @@ export default function GroupSettingsModal({
 
         <div
           className="group-settings-scroll flex-1 overflow-y-auto"
-          onScroll={(e) => setScrollTop((e.currentTarget as HTMLDivElement).scrollTop)}
           style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.55) rgba(3,7,18,.75)" }}
         >
           {loading ? (
@@ -283,21 +450,16 @@ export default function GroupSettingsModal({
           ) : detail ? (
             <div className="pb-5">
               <div
-                className="relative overflow-hidden border-b border-gray-800 transition-[height] duration-150"
-                style={{ height: heroHeight }}
+                className="relative h-[230px] overflow-hidden border-b border-gray-800"
               >
                 {detail.imageUrl ? (
                   <img
                     src={detail.imageUrl}
                     alt="Group"
-                    className="h-[230px] w-full object-cover"
-                    style={{ opacity: heroOpacity }}
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div
-                    className="flex h-[230px] w-full items-center justify-center bg-indigo-900/55 text-6xl font-bold"
-                    style={{ opacity: heroOpacity }}
-                  >
+                  <div className="flex h-full w-full items-center justify-center bg-indigo-900/55 text-6xl font-bold">
                     {initial}
                   </div>
                 )}
@@ -426,12 +588,31 @@ export default function GroupSettingsModal({
                 </div>
 
                 <div>
-                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Participants
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Participants
+                    </span>
+                    <span className="text-xs text-gray-600">
+                      {filteredParticipants.length}/{detail.participants.length}
+                    </span>
+                  </div>
+                  <div className="relative mb-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                    <input
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      type="search"
+                      placeholder="Filter members..."
+                      className="w-full rounded-xl border border-gray-800 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-gray-100 outline-none transition placeholder:text-gray-600 focus:border-indigo-500/60 focus:bg-white/[0.06]"
+                    />
                   </div>
                   <div className="space-y-2">
-                    {detail.participants.map((p) => {
-                      const owner = p.userId === detail.createdById;
+                    {filteredParticipants.length === 0 ? (
+                      <div className="rounded-xl border border-gray-800 bg-white/[0.02] px-3 py-4 text-center text-sm text-gray-500">
+                        No members found.
+                      </div>
+                    ) : filteredParticipants.map((p) => {
+                      const admin = isGroupAdmin(p);
                       const self = p.userId === detail.me.userId;
                       return (
                         <div
@@ -449,11 +630,11 @@ export default function GroupSettingsModal({
                               {self && <span className="ml-1 text-gray-500">(you)</span>}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {owner ? "Creator admin" : p.role || "Member"}
+                              {admin ? "Group admin" : p.role || "Member"}
                             </div>
                           </div>
 
-                          {!self && (
+                          {!self && !admin && (
                             <button
                               onClick={() => setPermissionUserId(permissionUserId === p.userId ? null : p.userId)}
                               className="rounded-lg p-1.5 text-gray-400 transition hover:bg-emerald-950/50 hover:text-emerald-200"
@@ -463,7 +644,7 @@ export default function GroupSettingsModal({
                             </button>
                           )}
 
-                          {canRemoveMembers && !owner && !self && (
+                          {canRemoveMembers && !admin && !self && (
                             <button
                               onClick={() => removeParticipant(p)}
                               disabled={saving}

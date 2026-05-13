@@ -410,7 +410,7 @@ export default function FriendChat({
   }, [messages, loading]);
 
   useLayoutEffect(() => {
-    if (!isExpanded || loading) return;
+    if (loading) return;
     const el = listRef.current;
     if (!el) return;
 

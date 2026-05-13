@@ -314,7 +314,7 @@ export default function GroupChat({
   }, [messages, loading]);
 
   useLayoutEffect(() => {
-    if (!isExpanded || loading) return;
+    if (loading) return;
     const el = listRef.current;
     if (!el) return;
 
@@ -473,7 +473,14 @@ export default function GroupChat({
   const header = (
     <div className="relative mb-3 flex items-center justify-between border-b border-gray-800/40 pb-3">
       <div className="min-w-0">
-        <div className="truncate font-semibold text-gray-100">{displayName}</div>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="block max-w-full truncate border-0 bg-transparent p-0 text-left font-semibold text-gray-100 transition-colors hover:text-indigo-300 focus:outline-none"
+          title="Group settings"
+        >
+          {displayName}
+        </button>
         <div className="truncate text-xs text-gray-500">
           {detail?.participants?.length
             ? `${detail.participants.length} members`
