@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react"; // en üstte ekle
 import Modal from "../components/Login/Modal";
-import AuthPopup from "../components/Login/AuthPopup";
+import AuthPopup from "../components/Login/AuthPopup/index";
 import ProfilePopup from "../components/ProfilePopup/index";
 import Navbar from "../components/Navbar/Navbar";
 import { useUser } from "../context/UserContext";
