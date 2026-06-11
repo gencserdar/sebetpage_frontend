@@ -3,13 +3,12 @@ export interface SearchResult {
   name: string;
   surname?: string;
   nickname: string;
-  type: "USER" | "GROUP";
+  type: "USER" | "COMMUNITY";
   mutualFriendCount: number;
   profileImageUrl?: string;
 }
 
-
 export interface SearchResponse {
   users: SearchResult[];
-  groups: SearchResult[];
+  communities: SearchResult[];
 }

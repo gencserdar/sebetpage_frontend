@@ -26,7 +26,7 @@ export default function MainRouter() {
         />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/profile/:nickname" element={<HomePage />} />
-        <Route path="/group/:id" element={<HomePage />} />
+        <Route path="/community/:id" element={<HomePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

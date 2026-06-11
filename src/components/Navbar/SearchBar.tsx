@@ -4,19 +4,18 @@ import { useUser } from "../../context/UserContext";
 import { searchUsersAndGroups } from "../../services/searchService";
 import { SearchResponse, SearchResult } from "../../types/searchTypes";
 
-type SearchFilter = 'users' | 'groups';
+type SearchFilter = "users" | "communities";
 
 export default function SearchBar() {
   const navigate = useNavigate();
   const { user } = useUser();
-  
-  // Search related states
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResponse>({ users: [], groups: [] });
+  const [searchResults, setSearchResults] = useState<SearchResponse>({ users: [], communities: [] });
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchFilter, setSearchFilter] = useState<SearchFilter>('users');
-  
+  const [searchFilter, setSearchFilter] = useState<SearchFilter>("users");
+
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,27 +33,24 @@ export default function SearchBar() {
     }
   }, [user]);
 
-  // Debounced search - only search when query has at least 1 character
   useEffect(() => {
     if (!user) return;
-    
+
     const timeoutId = setTimeout(() => {
       if (searchQuery.trim().length >= 1) {
         performSearch(searchQuery);
       } else if (searchDropdownOpen && searchQuery.trim().length === 0) {
-        setSearchResults({ users: [], groups: [] });
+        setSearchResults({ users: [], communities: [] });
       }
     }, 300);
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, user, performSearch, searchDropdownOpen]);
 
-  // Handle search input focus
   const handleSearchFocus = () => {
     setSearchDropdownOpen(true);
   };
 
-  // Handle clicking outside search
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -62,40 +58,37 @@ export default function SearchBar() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleResultClick = (result: SearchResult) => {
-    if (result.type === 'USER') {
-      // Pass the id so HomePage can fall back if the nickname went stale
-      // between when the search rendered and when the user clicked.
+    if (result.type === "USER") {
       navigate(`/profile/${result.nickname}`, { state: { fallbackId: result.id } });
     } else {
-      // Navigate to group page normally
-      navigate(`/group/${result.id}`);
+      navigate(`/community/${result.id}`);
     }
     setSearchDropdownOpen(false);
     setSearchQuery("");
   };
 
   const getFilteredResults = () => {
-    const { users, groups } = searchResults;
-    
+    const { users, communities } = searchResults;
+
     switch (searchFilter) {
-      case 'users':
-        return { users, groups: [] };
-      case 'groups':
-        return { users: [], groups };
+      case "users":
+        return { users, communities: [] };
+      case "communities":
+        return { users: [], communities };
       default:
-        return { users, groups };
+        return { users, communities };
     }
   };
 
   const renderSearchResults = () => {
     const filteredResults = getFilteredResults();
-    const { users, groups } = filteredResults;
-    const hasResults = users.length > 0 || groups.length > 0;
+    const { users, communities } = filteredResults;
+    const hasResults = users.length > 0 || communities.length > 0;
 
     if (searchLoading) {
       return (
@@ -119,7 +112,7 @@ export default function SearchBar() {
     if (searchQuery.trim().length === 0) {
       return (
         <div className="p-4 text-center text-gray-400">
-          Start typing to search for users and groups
+          Start typing to search for users and communities
         </div>
       );
     }
@@ -148,7 +141,7 @@ export default function SearchBar() {
                     {user.name} {user.surname}, @{user.nickname || user.name.toLowerCase()}
                   </div>
                   <div className="text-sm text-gray-400">
-                    {user.mutualFriendCount > 0 ? `${user.mutualFriendCount} mutual friends` : 'No mutual friends'}
+                    {user.mutualFriendCount > 0 ? `${user.mutualFriendCount} mutual friends` : "No mutual friends"}
                   </div>
                 </div>
               </button>
@@ -156,21 +149,23 @@ export default function SearchBar() {
           </div>
         )}
 
-        {groups.length > 0 && (
+        {communities.length > 0 && (
           <div>
-            {groups.map((group) => (
+            {communities.map((community) => (
               <button
-                key={`group-${group.id}`}
-                onClick={() => handleResultClick(group)}
+                key={`community-${community.id}`}
+                onClick={() => handleResultClick(community)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700/50 transition-colors text-left"
               >
                 <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  {group.name[0]}
+                  {community.name[0]}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium">{group.name}</div>
+                  <div className="font-medium">{community.name}</div>
                   <div className="text-sm text-gray-400">
-                    {group.mutualFriendCount > 0 ? `${group.mutualFriendCount} mutual friends in group` : 'Group'}
+                    {community.mutualFriendCount > 0
+                      ? `${community.mutualFriendCount} mutual friends in community`
+                      : "Community"}
                   </div>
                 </div>
               </button>
@@ -181,7 +176,6 @@ export default function SearchBar() {
     );
   };
 
-  // Only render if user is logged in
   if (!user) return null;
 
   return (
@@ -203,7 +197,7 @@ export default function SearchBar() {
           name="navbar-search"
           autoComplete="off"
           spellCheck={false}
-          placeholder="Search users and groups..."
+          placeholder="Search users and communities..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={handleSearchFocus}
@@ -211,34 +205,31 @@ export default function SearchBar() {
         />
       </div>
 
-      {/* Search Dropdown */}
       {searchDropdownOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50">
-          {/* Filter Tabs */}
           <div className="flex border-b border-gray-700">
             <button
-              onClick={() => setSearchFilter('users')}
+              onClick={() => setSearchFilter("users")}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                searchFilter === 'users'
-                  ? 'text-purple-400 border-b-2 border-purple-400 bg-gray-800/50'
-                  : 'text-gray-400 hover:text-gray-300'
+                searchFilter === "users"
+                  ? "text-purple-400 border-b-2 border-purple-400 bg-gray-800/50"
+                  : "text-gray-400 hover:text-gray-300"
               }`}
             >
               Users
             </button>
             <button
-              onClick={() => setSearchFilter('groups')}
+              onClick={() => setSearchFilter("communities")}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                searchFilter === 'groups'
-                  ? 'text-purple-400 border-b-2 border-purple-400 bg-gray-800/50'
-                  : 'text-gray-400 hover:text-gray-300'
+                searchFilter === "communities"
+                  ? "text-purple-400 border-b-2 border-purple-400 bg-gray-800/50"
+                  : "text-gray-400 hover:text-gray-300"
               }`}
             >
-              Groups
+              Communities
             </button>
           </div>
 
-          {/* Search Results */}
           {renderSearchResults()}
         </div>
       )}
