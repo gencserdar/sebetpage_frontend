@@ -53,19 +53,6 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: Props) {
     return 1 - Math.pow(1 - t, 4);
   };
 
-  // Auto slide fonksiyonu
-  const scheduleAutoSlide = useCallback(() => {
-    if (autoSlideRef.current) {
-      clearTimeout(autoSlideRef.current);
-    }
-    
-    if (!isDragging && !isTransitioning) {
-      autoSlideRef.current = setTimeout(() => {
-        goToSlide((currentIndex + 1) % images.length);
-      }, AUTO_SLIDE_INTERVAL);
-    }
-  }, [currentIndex, isDragging, isTransitioning]);
-
   // Slide geçiş fonksiyonu - FIXED ANIMATION
   const goToSlide = useCallback((targetIndex: number, immediate = false) => {
     if (isTransitioning || targetIndex === currentIndex) return;
@@ -119,6 +106,18 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: Props) {
     
     animationRef.current = requestAnimationFrame(animate);
   }, [currentIndex, dragOffset, isTransitioning]);
+
+  const scheduleAutoSlide = useCallback(() => {
+    if (autoSlideRef.current) {
+      clearTimeout(autoSlideRef.current);
+    }
+
+    if (!isDragging && !isTransitioning) {
+      autoSlideRef.current = setTimeout(() => {
+        goToSlide((currentIndex + 1) % images.length);
+      }, AUTO_SLIDE_INTERVAL);
+    }
+  }, [currentIndex, isDragging, isTransitioning, goToSlide]);
 
   // Touch/Mouse event handlers
   const handleStart = useCallback((clientX: number, clientY: number) => {

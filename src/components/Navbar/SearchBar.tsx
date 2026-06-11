@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { searchUsersAndGroups } from "../../services/searchService";
@@ -20,8 +20,7 @@ export default function SearchBar() {
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Search functionality
-  const performSearch = async (query: string) => {
+  const performSearch = useCallback(async (query: string) => {
     if (!user) return;
 
     setSearchLoading(true);
@@ -33,7 +32,7 @@ export default function SearchBar() {
     } finally {
       setSearchLoading(false);
     }
-  };
+  }, [user]);
 
   // Debounced search - only search when query has at least 1 character
   useEffect(() => {
@@ -48,7 +47,7 @@ export default function SearchBar() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, user]);
+  }, [searchQuery, user, performSearch, searchDropdownOpen]);
 
   // Handle search input focus
   const handleSearchFocus = () => {

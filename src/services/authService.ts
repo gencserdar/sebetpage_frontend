@@ -127,8 +127,7 @@ export async function register(
 
     const token = data.token || data.accessToken;
     if (!token) {
-      console.log(data.message || "Registration successful");
-      return true; 
+      return true;
     }
 
     setAccessToken(token);

@@ -1,7 +1,7 @@
 // services/blockService.ts
 import { api } from './apiService'; 
-import { useState, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext'; 
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useUser } from "../context/UserContext"; 
 
 // Types
 export interface BlockedUser {
@@ -169,31 +169,40 @@ export const blockService = new BlockService();
 
 // React Hook for Block Operations
 export const useBlockService = () => {
-  const { isAuthenticated } = useAuth();
+  const { user, loading: sessionLoading } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const authRef = useRef({ user, sessionLoading });
+
+  useEffect(() => {
+    authRef.current = { user, sessionLoading };
+  }, [user, sessionLoading]);
 
   const executeBlockOperation = useCallback(async (
     operation: () => Promise<any>
   ) => {
-    if (!isAuthenticated) {
-      throw new Error('User not authenticated');
+    const { user: currentUser, sessionLoading: sessionBusy } = authRef.current;
+    if (sessionBusy) {
+      throw new Error("Session is still loading");
+    }
+    if (!currentUser) {
+      throw new Error("User not authenticated");
     }
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await operation();
       return result;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
       setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   const blockUser = useCallback(async (blockedId: number) => {
     return executeBlockOperation(() => blockService.blockUser(blockedId));
@@ -223,6 +232,6 @@ export const useBlockService = () => {
     toggleBlock,
     loading,
     error,
-    clearError: () => setError(null)
+    clearError: useCallback(() => setError(null), [])
   };
 };

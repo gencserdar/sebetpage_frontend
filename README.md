@@ -1,46 +1,80 @@
-# Getting Started with Create React App
+# SebetPage Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React client for the SebetPage social/chat platform. It talks to the Spring Boot API gateway for REST and real-time messaging.
 
-## Available Scripts
+## Prerequisites
 
-In the project directory, you can run:
+- Node.js 18+
+- Backend gateway running (default `http://localhost:8000`)
 
-### `npm start`
+## Setup
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```bash
+cp .env.example .env
+npm install
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Environment
 
-### `npm test`
+| Variable | Purpose |
+| --- | --- |
+| `REACT_APP_GATEWAY_BASE_URL` | Gateway URL for WebSocket connections (e.g. `http://localhost:8000`) |
+| `REACT_APP_API_BASE_URL` | Optional synonym for the gateway WebSocket URL |
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+REST calls use relative `/api/*` paths. In development, Create React App proxies those to the gateway via `package.json` → `"proxy"`.
 
-### `npm run build`
+WebSocket connects directly to `REACT_APP_GATEWAY_BASE_URL/ws` with a short-lived ticket (see backend README).
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Scripts
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+| Command | Description |
+| --- | --- |
+| `npm start` | Dev server at [http://localhost:3000](http://localhost:3000) |
+| `npm run build` | Production build in `build/` |
+| `npm test` | Run tests |
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Architecture
 
-### `npm run eject`
+```text
+index.tsx
+  └── UserProvider
+        └── App
+              └── ChatSocketProvider   ← single WebSocket/STOMP connection
+                    └── MainRouter
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+### Key modules
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+| Path | Role |
+| --- | --- |
+| `src/services/apiService.ts` | Fetch wrapper, bearer token, refresh cookie, proactive token rotation |
+| `src/context/UserContext.tsx` | Session state (`/api/user/me`, login/logout) |
+| `src/context/ChatSocketContext.tsx` | Shared real-time socket for all components |
+| `src/hooks/useWebSocket.ts` | STOMP singleton (internal; use context in components) |
+| `src/components/ProfilePopup/` | Profile view/edit, friend actions, block UI |
+| `src/components/FriendsPanel/FriendChat/` | Direct-message chat widget |
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### Auth model
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+- Access token: in memory only (never `localStorage`)
+- Refresh token: HttpOnly cookie (`refreshToken`)
+- WebSocket: short-lived ticket via `POST /api/auth/ws-ticket` — JWT is never placed in the WS URL
 
-## Learn More
+### Routes
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+| Path | Page |
+| --- | --- |
+| `/` | Home (login modal, friends panel, chats) |
+| `/register` | Registration |
+| `/reset-password?code=...` | Password reset |
+| `/profile/:nickname` | Home with profile popup |
+| `/group/:id` | Home with group context |
+| `/?login=1` | Home with login modal open |
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Production notes
+
+Serve the `build/` folder behind a reverse proxy that forwards `/api/*` and `/ws` to the gateway. Without that, relative API calls will fail.
+
+## Related repo
+
+Backend microservices: `../microservices` — see its README for Docker Compose and env setup.

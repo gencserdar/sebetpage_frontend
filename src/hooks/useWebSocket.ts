@@ -1,21 +1,9 @@
-// src/hooks/useChatSocket.ts
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { api } from "../services/apiService";
-import { ChatMessage } from "../types/ChatMessageType";
 import { WsMessageDTO } from "../types/WSMessageDTO";
-
-/** Re-export Page so messageService's import keeps working */
-export type Page<T> = {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
-  first: boolean;
-  last: boolean;
-};
+import type { Page } from "../types/page";
 
 type ResolveResp = {
   id: number;
@@ -234,7 +222,6 @@ export function useChatSocket(principalEmail: string) {
         heartbeatOutgoing: 4000,
         
         onConnect: () => {
-          console.log("WebSocket connected for:", principalEmail);
           notifyConnectionState(true);
           
           // Subscribe to friends queue for presence and friend events
@@ -242,13 +229,8 @@ export function useChatSocket(principalEmail: string) {
             friendSub = sharedClient!.subscribe("/user/queue/friends", (message: IMessage) => {
               try {
                 const event = JSON.parse(message.body);
-                
-                // Add detailed logging for friend events
-                console.log("Raw friend event received:", event);
 
-                // Handle presence snapshot (initial state)
                 if (event?.type === "PRESENCE_SNAPSHOT" && Array.isArray(event.users)) {
-                  console.log("Processing presence snapshot with users:", event.users);
                   presenceState.clear();
                   event.users.forEach((u: any) =>
                     presenceState.set(Number(u.userId), !!u.online)
@@ -256,17 +238,7 @@ export function useChatSocket(principalEmail: string) {
                 } 
                 // Handle presence updates (real-time changes)
                 else if (event?.type === "PRESENCE_UPDATE") {
-                  console.log("Processing presence update:", event);
                   presenceState.set(Number(event.userId), !!event.online);
-                }
-                // Handle friend request events
-                else if (event?.type?.includes("FRIEND_REQUEST")) {
-                  console.log("Processing friend request event:", {
-                    type: event.type,
-                    requestId: event.requestId,
-                    request: event.request,
-                    fullEvent: event
-                  });
                 }
                 // Generic entity-update fan-out. Today the gateway only
                 // emits USER_UPDATED; future GROUP_UPDATED / POST_UPDATED
@@ -279,8 +251,6 @@ export function useChatSocket(principalEmail: string) {
                   });
                 }
 
-                // Notify all subscribed components
-                console.log("Notifying", friendCallbacks.size, "friend event subscribers");
                 friendCallbacks.forEach((callback) => callback(event));
               } catch (error) {
                 console.error("Friend event parse error:", error, "Raw message:", message.body);
@@ -372,7 +342,6 @@ export function useChatSocket(principalEmail: string) {
         },
 
         onDisconnect: () => {
-          console.log("WebSocket disconnected");
           notifyConnectionState(false);
         }
       });
@@ -460,19 +429,6 @@ export function useChatSocket(principalEmail: string) {
       }
 
       return response.json() as Promise<ResolveResp>;
-    },
-    []
-  );
-
-  /** Send a message using the legacy ChatMessage shape. The monolith used
-   *  email-addressed messages; the new gateway is id-addressed, so we do not
-   *  support this overload anymore. Callers should resolve the conversation
-   *  once and call `sendToConversation` with the ids. */
-  const sendMessage = useCallback(
-    async (_message: ChatMessage) => {
-      console.warn(
-        "sendMessage(ChatMessage) is deprecated — use sendToConversation(conversationId, senderId, content)."
-      );
     },
     []
   );
@@ -630,14 +586,11 @@ export function useChatSocket(principalEmail: string) {
    *  and explicit disconnect() share one code path. */
   const disconnect = useCallback(() => {
     tearDownSocket();
-    console.log("WebSocket disconnected and cleaned up");
   }, []);
 
   return {
-    // Core chat functionality
     subscribeToConversation,
     resolveDirectConversation,
-    sendMessage,
     sendToConversation,
 
     // Message history

@@ -25,7 +25,7 @@ export default function ResetPasswordPage() {
       const ok = await resetPassword(code, password);
       if (ok) {
         setSuccess(true);
-        setTimeout(() => navigate("/login"), 2000);
+        setTimeout(() => navigate("/?login=1"), 2000);
       }
     } catch (err: any) {
       setError(err.message || "Something went wrong");

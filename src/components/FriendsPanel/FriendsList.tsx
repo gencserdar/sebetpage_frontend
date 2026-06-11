@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { getFriends } from "../../services/friendService";
 import { UserDTO } from "../../types/userDTO";
-import { useChatSocket } from "../../hooks/useWebSocket";
+import { useChatSocketContext } from "../../context/ChatSocketContext";
 import { useUser } from "../../context/UserContext";
 import { api } from "../../services/apiService";
 
@@ -38,7 +38,7 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
   // WS principal
   const { user } = useUser();
   const { subscribeFriendEvents, subscribeUnreadEvents, getConversationUnread, subscribeUserUpdates } =
-    useChatSocket(user?.email || "");
+    useChatSocketContext();
 
   const reload = useCallback(async () => {
     try {

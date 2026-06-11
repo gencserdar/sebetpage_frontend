@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react"; // en üstte ekle
 import Modal from "../components/Login/Modal";
 import AuthPopup from "../components/Login/AuthPopup";
-import ProfilePopup from "../components/ProfilePopup";
+import ProfilePopup from "../components/ProfilePopup/index";
 import Navbar from "../components/Navbar/Navbar";
 import { useUser } from "../context/UserContext";
 import { getUserByNickname, getUserById } from "../services/userService";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
-import FriendChat from "../components/FriendsPanel/FriendChat";
+import FriendChat from "../components/FriendsPanel/FriendChat/index";
 import GroupChat from "../components/FriendsPanel/GroupChat";
 import ExpandedMessagesRail from "../components/FriendsPanel/ExpandedMessagesRail";
-import { useChatSocket } from "../hooks/useWebSocket";
+import { useChatSocketContext } from "../context/ChatSocketContext";
 import { MessagingGroup, MessagingGroupDetail } from "../services/chatApiService";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { nickname } = useParams<{ nickname: string }>();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
   const { user, loading: userLoading } = useUser();
   const [selectedFriend, setSelectedFriend] = useState<UserDTO | null>(null);
@@ -37,7 +38,14 @@ export default function HomePage() {
 
   // Tap into the WS singleton so the Messages button gets a live badge whenever
   // a message arrives in any conversation, even when the panel is closed.
-  const { subscribeUnreadEvents, subscribeUserUpdates } = useChatSocket(user?.email || "");
+  const { subscribeUnreadEvents, subscribeUserUpdates } = useChatSocketContext();
+
+  useEffect(() => {
+    if (searchParams.get("login") === "1") {
+      setOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -72,6 +80,38 @@ export default function HomePage() {
     return () => unsub();
   }, [user, subscribeUserUpdates, nickname, navigate]);
 
+  const openProfilePopup = useCallback(
+    async (userNickname: string) => {
+      setProfileLoading(true);
+      try {
+        const userData = await getUserByNickname(userNickname);
+        setProfileUser(userData);
+        setProfilePopupOpen(true);
+      } catch (error) {
+        const fallbackId: number | undefined = (location.state as { fallbackId?: number })
+          ?.fallbackId;
+        if (fallbackId) {
+          try {
+            const fresh = await getUserById(fallbackId);
+            setProfileUser(fresh);
+            setProfilePopupOpen(true);
+            if (fresh.nickname && fresh.nickname !== userNickname) {
+              navigate(`/profile/${fresh.nickname}`, { replace: true });
+            }
+            return;
+          } catch (e2) {
+            console.error("Profile fallback by id failed:", e2);
+          }
+        }
+        console.error("Failed to fetch user profile:", error);
+        navigate("/");
+      } finally {
+        setProfileLoading(false);
+      }
+    },
+    [location.state, navigate]
+  );
+
   useEffect(() => {
     if (nickname && location.pathname.startsWith("/profile/")) {
       openProfilePopup(nickname);
@@ -79,40 +119,7 @@ export default function HomePage() {
       setProfilePopupOpen(false);
       setProfileUser(null);
     }
-  }, [nickname, location.pathname]);
-
-  const openProfilePopup = async (userNickname: string) => {
-    setProfileLoading(true);
-    try {
-      const userData = await getUserByNickname(userNickname);
-      setProfileUser(userData);
-      setProfilePopupOpen(true);
-    } catch (error) {
-      // Stale-nickname fallback: a list could've been rendered before the
-      // owner renamed themselves, so the click points at a name that no
-      // longer exists. Callers can pass `state.fallbackId` along with the
-      // navigate, and we re-resolve by id and bounce the URL to the right
-      // nickname.
-      const fallbackId: number | undefined = (location.state as any)?.fallbackId;
-      if (fallbackId) {
-        try {
-          const fresh = await getUserById(fallbackId);
-          setProfileUser(fresh);
-          setProfilePopupOpen(true);
-          if (fresh.nickname && fresh.nickname !== userNickname) {
-            navigate(`/profile/${fresh.nickname}`, { replace: true });
-          }
-          return;
-        } catch (e2) {
-          console.error("Profile fallback by id failed:", e2);
-        }
-      }
-      console.error("Failed to fetch user profile:", error);
-      navigate("/");
-    } finally {
-      setProfileLoading(false);
-    }
-  };
+  }, [nickname, location.pathname, openProfilePopup]);
 
   const closeProfilePopup = () => {
     setProfilePopupOpen(false);
@@ -164,7 +171,7 @@ export default function HomePage() {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col">
         <div className="transition-all duration-300">
-          <Navbar onAuthClick={handleAuthClick} shiftRight={false} />
+          <Navbar onAuthClick={handleAuthClick} />
         </div>
         <main className="flex flex-1 items-center justify-center px-4">
           <div className="flex w-full max-w-2xl flex-col items-center gap-6">
@@ -197,7 +204,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Navbar */}
       <div className="transition-all duration-300">
-        <Navbar onAuthClick={handleAuthClick} shiftRight={showFriendsPanel} />
+        <Navbar onAuthClick={handleAuthClick} />
       </div>
 
       {/* Main content */}
@@ -242,10 +249,7 @@ export default function HomePage() {
 
           <FriendsPanel
             isOpen={showFriendsPanel}
-            onClose={() => {
-              console.log("closing panel");
-              setShowFriendsPanel(false);
-            }}
+            onClose={() => setShowFriendsPanel(false)}
             setSelectedFriend={selectFriend}
             setSelectedGroup={selectGroup}
             activeGroupId={selectedGroup?.group.id}

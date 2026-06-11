@@ -5,7 +5,6 @@ import UserMenu from "./UserMenu";
 
 interface NavbarProps {
   onAuthClick: () => void;
-  shiftRight?: boolean;
 }
 
 
@@ -23,10 +22,10 @@ export default function Navbar({ onAuthClick }: NavbarProps) {
       </div>
 
       {/* Navigation Links */}
-      <nav className="space-x-8 text-lg mr-auto ml-40">
-        <a href="#" className="hover:text-pink-400 transition-colors">Friends</a>
-        <a href="#" className="hover:text-purple-400 transition-colors">Explore</a>
-        <a href="#" className="hover:text-orange-400 transition-colors">Community</a>
+      <nav className="space-x-8 text-lg mr-auto ml-40" aria-label="Main navigation">
+        <span className="text-gray-500 cursor-default" title="Coming soon">Friends</span>
+        <span className="text-gray-500 cursor-default" title="Coming soon">Explore</span>
+        <span className="text-gray-500 cursor-default" title="Coming soon">Community</span>
       </nav>
 
       {/* Right Side - Auth/User controls */}

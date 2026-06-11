@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { register } from "../services/authService";
 
 export default function RegisterPage() {
@@ -108,16 +109,16 @@ export default function RegisterPage() {
 
           <div className="text-center text-sm text-gray-400">
             Already have an account?{" "}
-            <a href="/login" className="text-blue-400 hover:underline">
+            <Link to="/?login=1" className="text-blue-400 hover:underline">
               Log in
-            </a>
+            </Link>
           </div>
         </form>
       )}
 
       {/* Popup */}
       {showPopup && (
-        <div className="absolute inZset-0 flex items-center justify-center bg-black/70 z-50">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-50">
           <div className="bg-white/10 backdrop-blur-xl rounded-xl p-8 max-w-sm w-full text-center">
             <h2 className="text-2xl font-bold mb-4">Check Your Email 📩</h2>
             <p className="text-gray-300 mb-6">

@@ -13,7 +13,7 @@ interface ConfirmationModalData {
 }
 
 export default function BlockedUsersPopup({ onClose }: BlockedUsersPopupProps) {
-  const { getMyBlocks, unblockUser, loading } = useBlockService();
+  const { getMyBlocks, unblockUser } = useBlockService();
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +50,6 @@ export default function BlockedUsersPopup({ onClose }: BlockedUsersPopupProps) {
       
       // Remove user from the list
       setBlockedUsers(prev => prev.filter(u => u.blockedId !== user.blockedId));
-      
-      console.log(`Successfully unblocked user: ${user.blockedNickname}`);
     } catch (err) {
       console.error("Failed to unblock user:", err);
       setError(`Failed to unblock ${user.blockedNickname}`);

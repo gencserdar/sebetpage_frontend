@@ -5,15 +5,6 @@ export interface FieldUpdateResponse {
   value: string;
 }
 
-// All profile mutations moved under the new gateway's /api/user/* routes.
-// The old monolith exposed them under /api/profile/* — those paths 404 now.
-
-export const getCurrentUser = async () => {
-  const res = await api("/api/user/me");
-  if (!res.ok) throw new Error(await res.text());
-  return res.json(); // UserDTO
-};
-
 export const uploadPhoto = async (file: File): Promise<FieldUpdateResponse> => {
   const formData = new FormData();
   formData.append("file", file);
@@ -23,18 +14,9 @@ export const uploadPhoto = async (file: File): Promise<FieldUpdateResponse> => {
     body: formData,
   });
   if (!res.ok) throw new Error(await res.text());
-  // The gateway returns `{ profileImageUrl: <url> }`. Flatten to the
-  // legacy FieldUpdateResponse shape so callers reading response.value
-  // (ProfilePopup.handlePhotoUpload) keep working — without this the
-  // optimistic update writes `undefined` into profileImageUrl and the
-  // own-profile preview shows the default avatar until the WS push
-  // re-synchronises (and even then only when other tabs / sessions
-  // receive the entity-updated frame).
   const data = await res.json();
   return { field: "profileImageUrl", value: data.profileImageUrl };
 };
-
-/* ---------- email change (two-step, code sent to NEW email) ---------- */
 
 export const requestEmailChange = async (newEmail: string): Promise<void> => {
   const res = await api(`/api/user/request-email-change?newEmail=${encodeURIComponent(newEmail)}`, {
@@ -60,8 +42,6 @@ export const updateNameSurname = async (
     { method: "POST" }
   );
   if (!res.ok) throw new Error(await res.text());
-  // Gateway returns { name, surname } as a map; flatten to the legacy
-  // FieldUpdateResponse[] shape so existing callers don't need to change.
   const data = await res.json();
   return [
     { field: "name", value: data.name },
@@ -76,8 +56,6 @@ export const updateNickname = async (nickname: string): Promise<FieldUpdateRespo
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 };
-
-/* ---------- password change (two-step, code sent to CURRENT email) ----- */
 
 export const requestPasswordChange = async (
   currentPassword: string,

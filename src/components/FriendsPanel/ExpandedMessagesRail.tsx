@@ -4,7 +4,7 @@ import FriendsList from "./FriendsList";
 import { UserDTO } from "../../types/userDTO";
 import { chatApiService, MessagingGroup } from "../../services/chatApiService";
 import { useUser } from "../../context/UserContext";
-import { useChatSocket } from "../../hooks/useWebSocket";
+import { useChatSocketContext } from "../../context/ChatSocketContext";
 
 interface Props {
   activeGroupId?: number | null;
@@ -23,7 +23,7 @@ export default function ExpandedMessagesRail({
   const conversationsRef = useRef<any[]>([]);
   const { user } = useUser();
   const { subscribeFriendEvents, subscribeUnreadEvents, getConversationUnread } =
-    useChatSocket(user?.email || "");
+    useChatSocketContext();
 
   const recomputeGroupUnread = useCallback(
     (rows: any[] = conversationsRef.current) => {

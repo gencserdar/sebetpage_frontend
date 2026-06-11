@@ -6,7 +6,7 @@ import GroupSettingsModal from "./GroupSettingsModal";
 import { UserDTO } from "../../types/userDTO";
 import { chatApiService, MessagingGroup, MessagingGroupDetail } from "../../services/chatApiService";
 import { useUser } from "../../context/UserContext";
-import { useChatSocket } from "../../hooks/useWebSocket";
+import { useChatSocketContext } from "../../context/ChatSocketContext";
 
 interface Props {
   isOpen: boolean;
@@ -38,7 +38,7 @@ export default function FriendsPanel({
   const conversationsRef = useRef<any[]>([]);
   const { user } = useUser();
   const { subscribeFriendEvents, subscribeUnreadEvents, getConversationUnread } =
-    useChatSocket(user?.email || "");
+    useChatSocketContext();
 
   const groupDisplayName = (g: MessagingGroup) =>
     g.title && g.title.trim() ? g.title.trim() : "Group Chat";
