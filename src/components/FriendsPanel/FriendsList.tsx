@@ -37,8 +37,13 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
 
   // WS principal
   const { user } = useUser();
-  const { subscribeFriendEvents, subscribeUnreadEvents, getConversationUnread, subscribeUserUpdates } =
-    useChatSocketContext();
+  const {
+    subscribeFriendEvents,
+    requestPresenceSnapshot,
+    subscribeUnreadEvents,
+    getConversationUnread,
+    subscribeUserUpdates,
+  } = useChatSocketContext();
 
   const reload = useCallback(async () => {
     try {
@@ -110,6 +115,7 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
       if (t === "FRIEND_ADDED" || t === "FRIEND_REMOVED" || t === "REQUEST_ACCEPTED") {
         void reload();
         void reloadConversations();
+        requestPresenceSnapshot();
         return;
       }
 
@@ -135,7 +141,7 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
     });
 
     return () => unsub();
-  }, [reload, reloadConversations, subscribeFriendEvents, applyPresence]);
+  }, [reload, reloadConversations, subscribeFriendEvents, requestPresenceSnapshot, applyPresence]);
 
   // Real-time profile sync — when a friend renames themselves / changes
   // photo, patch the matching entry in our local list so the displayed

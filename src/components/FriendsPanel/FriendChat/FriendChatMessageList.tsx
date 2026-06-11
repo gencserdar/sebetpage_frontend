@@ -1,15 +1,12 @@
 import ChatBubble from "./ChatBubble";
 import DaySeparator from "./DaySeparator";
 import { RenderItem } from "./types";
-import { WsMessageDTO } from "../../../types/WSMessageDTO";
-
 interface FriendChatMessageListProps {
   listRef: React.RefObject<HTMLDivElement | null>;
   expanded: boolean;
   loading: boolean;
   loadingOlder: boolean;
   renderItems: RenderItem[];
-  messages: WsMessageDTO[];
   myUserId: number | null;
   seenMyMessageId: number | null;
 }
@@ -20,7 +17,6 @@ export default function FriendChatMessageList({
   loading,
   loadingOlder,
   renderItems,
-  messages,
   myUserId,
   seenMyMessageId,
 }: FriendChatMessageListProps) {
@@ -45,7 +41,6 @@ export default function FriendChatMessageList({
         <ChatBubble
           key={it.key}
           message={it.data}
-          messages={messages}
           myUserId={myUserId}
           seenMyMessageId={seenMyMessageId}
         />

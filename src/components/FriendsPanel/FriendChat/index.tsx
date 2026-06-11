@@ -70,7 +70,6 @@ export default function FriendChat({
       loading={chat.loading}
       loadingOlder={chat.loadingOlder}
       renderItems={chat.renderItems}
-      messages={chat.messages}
       myUserId={chat.myUserId}
       seenMyMessageId={chat.seenMyMessageId}
     />

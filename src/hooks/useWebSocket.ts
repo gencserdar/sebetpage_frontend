@@ -517,6 +517,15 @@ export function useChatSocket(principalEmail: string) {
     []
   );
 
+  /** Ask the server to push a fresh presence snapshot (e.g. after a new friend). */
+  const requestPresenceSnapshot = useCallback(() => {
+    if (!sharedClient?.connected) return;
+    sharedClient.publish({
+      destination: "/app/friends/snapshot",
+      body: "{}",
+    });
+  }, []);
+
   /** Subscribe to friend events (presence updates, friend removal, etc.) */
   const subscribeFriendEvents = useCallback(
     (callback: (event: any) => void) => {
@@ -603,6 +612,7 @@ export function useChatSocket(principalEmail: string) {
 
     // Friends and presence
     subscribeFriendEvents,
+    requestPresenceSnapshot,
     getUserOnlineStatus,
 
     // Unread badges
