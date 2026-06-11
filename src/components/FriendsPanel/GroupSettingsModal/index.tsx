@@ -3,6 +3,7 @@ import GroupSettingsDeleteConfirm from "./GroupSettingsDeleteConfirm";
 import GroupSettingsDescriptionSection from "./GroupSettingsDescriptionSection";
 import GroupSettingsHeader from "./GroupSettingsHeader";
 import GroupSettingsHero from "./GroupSettingsHero";
+import GroupSettingsAddMembersSection from "./GroupSettingsAddMembersSection";
 import GroupSettingsMembersSection from "./GroupSettingsMembersSection";
 import GroupSettingsTitleSection from "./GroupSettingsTitleSection";
 import { useGroupSettings } from "./useGroupSettings";
@@ -67,9 +68,25 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
                     onSave={() => settings.saveGroupPatch({ description: settings.descriptionDraft })}
                   />
 
+                  <GroupSettingsAddMembersSection
+                    canAddMembers={settings.canAddMembers}
+                    showPanel={settings.showAddMembersPanel}
+                    addSearch={settings.addSearch}
+                    loadingFriends={settings.loadingFriends}
+                    filteredFriends={settings.filteredFriends}
+                    addingMemberId={settings.addingMemberId}
+                    saving={settings.saving}
+                    addBtnRef={settings.addBtnRef}
+                    addPanelRef={settings.addPanelRef}
+                    onTogglePanel={settings.handleToggleAddMembers}
+                    onAddSearchChange={settings.setAddSearch}
+                    onAddMember={settings.addMember}
+                  />
+
                   <GroupSettingsMembersSection
                     detail={settings.detail}
-                    filteredParticipants={settings.filteredParticipants}
+                    regularParticipants={settings.regularParticipants}
+                    blockedParticipants={settings.blockedParticipants}
                     memberSearch={settings.memberSearch}
                     onlineParticipantIds={settings.onlineParticipantIds}
                     permissionUserId={settings.permissionUserId}
@@ -87,6 +104,7 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
                     }
                     onRemoveParticipant={settings.removeParticipant}
                     onTogglePermission={settings.togglePermission}
+                    onOpenParticipantProfile={settings.openParticipantProfile}
                   />
 
                   <GroupSettingsActionsSection

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   chatApiService,
   MessagingGroupDetail,
@@ -6,6 +7,8 @@ import {
   MessagingGroupPermissions,
 } from "../../../services/chatApiService";
 import { useChatSocketContext } from "../../../context/ChatSocketContext";
+import { getFriends } from "../../../services/friendService";
+import { UserDTO } from "../../../types/userDTO";
 import { emptyPermissions } from "./constants";
 import { GroupSettingsModalProps } from "./types";
 
@@ -35,8 +38,15 @@ export function useGroupSettings({
   const [deleteText, setDeleteText] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [onlineParticipantIds, setOnlineParticipantIds] = useState<Set<number>>(() => new Set());
+  const [showAddMembersPanel, setShowAddMembersPanel] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const [friendsList, setFriendsList] = useState<UserDTO[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [addingMemberId, setAddingMemberId] = useState<number | null>(null);
 
   const detailRef = useRef<MessagingGroupDetail | null>(null);
+  const addPanelRef = useRef<HTMLDivElement | null>(null);
+  const addBtnRef = useRef<HTMLButtonElement | null>(null);
   const editingTitleRef = useRef(false);
   const editingDescriptionRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -44,6 +54,7 @@ export function useGroupSettings({
   const pendingPermissionsRef = useRef<Map<number, MessagingGroupPermissions>>(new Map());
   const permissionSyncingRef = useRef<Set<number>>(new Set());
 
+  const navigate = useNavigate();
   const { subscribeFriendEvents, getUserOnlineStatus } = useChatSocketContext();
 
   useEffect(() => {
@@ -128,6 +139,16 @@ export function useGroupSettings({
   useEffect(() => {
     if (!open || !groupId) return undefined;
     return subscribeFriendEvents((event: any) => {
+      if (event?.type === "BLOCK_STATUS_CHANGED") {
+        const otherId = Number(event?.userId);
+        if (
+          detailRef.current?.participants.some((participant) => participant.userId === otherId)
+        ) {
+          void load(false);
+        }
+        return;
+      }
+
       if (Number(event?.conversationId) !== Number(groupId)) return;
       if (event?.type === "MESSAGING_GROUP_DELETED" || event?.type === "MESSAGING_GROUP_LEFT") {
         onDeleted?.(groupId);
@@ -147,6 +168,7 @@ export function useGroupSettings({
     }
     const next = new Set<number>();
     detail.participants.forEach((participant) => {
+      if (participant.blocksMe) return;
       if (getUserOnlineStatus(participant.userId)) next.add(participant.userId);
     });
     setOnlineParticipantIds(next);
@@ -157,6 +179,11 @@ export function useGroupSettings({
     const participantIds = () =>
       new Set((detailRef.current?.participants || []).map((participant) => participant.userId));
 
+    const blocksMeUser = (userId: number) =>
+      detailRef.current?.participants.some(
+        (participant) => participant.userId === userId && participant.blocksMe
+      ) ?? false;
+
     return subscribeFriendEvents((event: any) => {
       const type = event?.type;
       if (type === "PRESENCE_SNAPSHOT" && Array.isArray(event.users)) {
@@ -164,7 +191,13 @@ export function useGroupSettings({
         const next = new Set<number>();
         event.users.forEach((entry: any) => {
           const userId = Number(entry?.userId);
-          if (entry?.online && activeParticipantIds.has(userId)) next.add(userId);
+          if (
+            entry?.online &&
+            activeParticipantIds.has(userId) &&
+            !blocksMeUser(userId)
+          ) {
+            next.add(userId);
+          }
         });
         setOnlineParticipantIds(next);
         return;
@@ -175,12 +208,14 @@ export function useGroupSettings({
       if (type === "PRESENCE_UPDATE") {
         setOnlineParticipantIds((prev) => {
           const next = new Set(prev);
-          if (event.online) next.add(userId);
+          if (event.online && !blocksMeUser(userId)) next.add(userId);
           else next.delete(userId);
           return next;
         });
       } else if (type === "FRIEND_ONLINE") {
-        setOnlineParticipantIds((prev) => new Set(prev).add(userId));
+        if (!blocksMeUser(userId)) {
+          setOnlineParticipantIds((prev) => new Set(prev).add(userId));
+        }
       } else if (type === "FRIEND_OFFLINE") {
         setOnlineParticipantIds((prev) => {
           const next = new Set(prev);
@@ -208,6 +243,19 @@ export function useGroupSettings({
   const canEditDescription = canGrant("canChangeDescription");
   const canEditPhoto = canGrant("canChangePhoto");
   const canRemoveMembers = canGrant("canRemoveMembers");
+  const canAddMembers = canGrant("canAddMembers");
+
+  const participantIds = useMemo(
+    () => new Set((detail?.participants || []).map((p) => p.userId)),
+    [detail]
+  );
+
+  const filteredFriends = useMemo(() => {
+    const q = addSearch.trim().toLowerCase();
+    return friendsList
+      .filter((f) => !participantIds.has(f.id))
+      .filter((f) => !q || f.nickname.toLowerCase().includes(q));
+  }, [friendsList, participantIds, addSearch]);
 
   const displayName = detail?.title?.trim() || "Group chat";
   const initial = displayName.charAt(0).toUpperCase();
@@ -230,18 +278,26 @@ export function useGroupSettings({
       : detail.participants
     : [];
   const selfUserId = detail?.me.userId;
-  const filteredParticipants = filtered
-    .map((participant, index) => ({ participant, index }))
-    .sort((a, b) => {
-      const aSelf = a.participant.userId === selfUserId;
-      const bSelf = b.participant.userId === selfUserId;
-      if (aSelf !== bSelf) return aSelf ? -1 : 1;
-      const aOnline = aSelf || onlineParticipantIds.has(a.participant.userId);
-      const bOnline = bSelf || onlineParticipantIds.has(b.participant.userId);
-      if (aOnline !== bOnline) return aOnline ? -1 : 1;
-      return a.index - b.index;
-    })
-    .map(({ participant }) => participant);
+  const sortParticipants = (items: MessagingGroupParticipant[]) =>
+    items
+      .map((participant, index) => ({ participant, index }))
+      .sort((a, b) => {
+        const aSelf = a.participant.userId === selfUserId;
+        const bSelf = b.participant.userId === selfUserId;
+        if (aSelf !== bSelf) return aSelf ? -1 : 1;
+        const aOnline = aSelf || onlineParticipantIds.has(a.participant.userId);
+        const bOnline = bSelf || onlineParticipantIds.has(b.participant.userId);
+        if (aOnline !== bOnline) return aOnline ? -1 : 1;
+        return a.index - b.index;
+      })
+      .map(({ participant }) => participant);
+
+  const regularParticipants = sortParticipants(
+    filtered.filter((participant) => !participant.blockedByMe)
+  );
+  const blockedParticipants = sortParticipants(
+    filtered.filter((participant) => participant.blockedByMe)
+  );
 
   const setPermissionSyncing = (userId: number, syncing: boolean) => {
     const next = new Set(permissionSyncingRef.current);
@@ -420,8 +476,68 @@ export function useGroupSettings({
     }
   };
 
+  useEffect(() => {
+    if (!showAddMembersPanel) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        addPanelRef.current &&
+        !addPanelRef.current.contains(e.target as Node) &&
+        addBtnRef.current &&
+        !addBtnRef.current.contains(e.target as Node)
+      ) {
+        setShowAddMembersPanel(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showAddMembersPanel]);
+
+  const handleToggleAddMembers = useCallback(async () => {
+    if (!canAddMembers) return;
+    if (showAddMembersPanel) {
+      setShowAddMembersPanel(false);
+      return;
+    }
+    setShowAddMembersPanel(true);
+    if (friendsList.length === 0 && !loadingFriends) {
+      setLoadingFriends(true);
+      try {
+        setFriendsList(await getFriends());
+      } catch (e) {
+        console.error("Failed to load friends:", e);
+      } finally {
+        setLoadingFriends(false);
+      }
+    }
+  }, [canAddMembers, showAddMembersPanel, friendsList.length, loadingFriends]);
+
+  const addMember = async (friend: UserDTO) => {
+    if (!groupId || addingMemberId || !canAddMembers) return;
+    setAddingMemberId(friend.id);
+    try {
+      const next = await chatApiService.addMessagingGroupMember(groupId, friend.id);
+      applyDetail(next);
+      setShowAddMembersPanel(false);
+      setAddSearch("");
+    } catch (e) {
+      console.error("Failed to add member:", e);
+      setError(e instanceof Error ? e.message : "Failed to add member");
+    } finally {
+      setAddingMemberId(null);
+    }
+  };
+
+  const openParticipantProfile = useCallback(
+    (nickname: string, userId: number) => {
+      if (!nickname) return;
+      navigate(`/profile/${nickname}`, { state: { fallbackId: userId } });
+    },
+    [navigate]
+  );
+
   const close = () => {
     if (saving) return;
+    setShowAddMembersPanel(false);
     onClose();
   };
 
@@ -471,9 +587,22 @@ export function useGroupSettings({
     canEditDescription,
     canEditPhoto,
     canRemoveMembers,
+    canAddMembers,
+    showAddMembersPanel,
+    addSearch,
+    setAddSearch,
+    loadingFriends,
+    filteredFriends,
+    addingMemberId,
+    addPanelRef,
+    addBtnRef,
+    handleToggleAddMembers,
+    addMember,
+    openParticipantProfile,
     displayName,
     initial,
-    filteredParticipants,
+    regularParticipants,
+    blockedParticipants,
     isGroupAdmin,
     canGrant,
     close,

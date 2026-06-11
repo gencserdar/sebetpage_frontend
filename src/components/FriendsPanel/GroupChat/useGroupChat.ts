@@ -55,6 +55,7 @@ export function useGroupChat({
     () => new Map(initialParticipants.map((p) => [p.id, p.nickname]))
   );
 
+  const detailRef = useRef<MessagingGroupDetail | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const addPanelRef = useRef<HTMLDivElement>(null);
@@ -85,6 +86,7 @@ export function useGroupChat({
 
   const applyDetail = useCallback(
     (next: MessagingGroupDetail) => {
+      detailRef.current = next;
       setDetail(next);
       setNicknames((prev) => {
         const copy = new Map(prev);
@@ -113,6 +115,16 @@ export function useGroupChat({
 
   useEffect(() => {
     return subscribeFriendEvents((event: any) => {
+      if (event?.type === "BLOCK_STATUS_CHANGED") {
+        const otherId = Number(event?.userId);
+        if (
+          detailRef.current?.participants.some((participant) => participant.userId === otherId)
+        ) {
+          void loadDetail();
+        }
+        return;
+      }
+
       if (Number(event?.conversationId) !== Number(conversationId)) return;
       if (event?.type === "MESSAGING_GROUP_DELETED" || event?.type === "MESSAGING_GROUP_LEFT") {
         onGroupDeleted?.(conversationId);
@@ -130,6 +142,27 @@ export function useGroupChat({
     () => new Set((detail?.participants || []).map((p) => p.userId)),
     [detail]
   );
+  const blockedSenderIds = useMemo(
+    () =>
+      new Set(
+        (detail?.participants || [])
+          .filter((p) => p.blockedByMe)
+          .map((p) => p.userId)
+      ),
+    [detail]
+  );
+  const isMessageVisible = useCallback(
+    (senderId: number) => {
+      if (!senderId || senderId === myUserId) return true;
+      return !blockedSenderIds.has(senderId);
+    },
+    [blockedSenderIds, myUserId]
+  );
+
+  useEffect(() => {
+    setMessages((prev) => prev.filter((m) => isMessageVisible(Number(m.senderId))));
+  }, [blockedSenderIds, isMessageVisible]);
+
   const canAddMembers =
     !!detail &&
     (detail.createdById === detail.me.userId ||
@@ -196,7 +229,7 @@ export function useGroupChat({
         setLoading(true);
         const latest = await getLatestMessagesAsc(conversationId, PAGE_SIZE);
         if (!mounted) return;
-        setMessages(latest);
+        setMessages(latest.filter((m) => isMessageVisible(Number(m.senderId))));
         setHasMore(latest.length >= PAGE_SIZE);
         setNextPage(1);
 
@@ -209,6 +242,7 @@ export function useGroupChat({
         unsub = subscribeToConversation(conversationId, (raw: any) => {
           if (raw?.type === "READ") return;
           const m = raw as WsMessageDTO;
+          if (!isMessageVisible(Number(m.senderId))) return;
           setMessages((prev) =>
             prev.some((x) => x.id === m.id) ? prev : [...prev, m]
           );
@@ -227,7 +261,7 @@ export function useGroupChat({
       mounted = false;
       unsub?.();
     };
-  }, [conversationId, getLatestMessagesAsc, markRead, myUserId, subscribeToConversation]);
+  }, [conversationId, getLatestMessagesAsc, isMessageVisible, markRead, myUserId, subscribeToConversation]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder || !hasMore) return;
@@ -239,7 +273,9 @@ export function useGroupChat({
       const asc = page.content.slice().reverse();
       setMessages((m) => {
         const existing = new Set(m.map((x) => x.id));
-        const filtered = asc.filter((x) => !existing.has(x.id));
+        const filtered = asc.filter(
+          (x) => !existing.has(x.id) && isMessageVisible(Number(x.senderId))
+        );
         return filtered.length ? [...filtered, ...m] : m;
       });
       setNextPage((p) => p + 1);
@@ -252,7 +288,7 @@ export function useGroupChat({
         el2.scrollTop = el2.scrollHeight - prev;
       });
     }
-  }, [conversationId, nextPage, hasMore, loadingOlder, getPagedMessagesDesc]);
+  }, [conversationId, nextPage, hasMore, loadingOlder, getPagedMessagesDesc, isMessageVisible]);
 
   useLayoutEffect(() => {
     if (loading) return;

@@ -32,6 +32,8 @@ export interface MessagingGroupParticipant {
   profileImageUrl?: string;
   role: string;
   muted: boolean;
+  blockedByMe?: boolean;
+  blocksMe?: boolean;
   permissions: MessagingGroupPermissions;
 }
 
