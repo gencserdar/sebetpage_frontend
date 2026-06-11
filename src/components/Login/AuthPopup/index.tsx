@@ -1,6 +1,7 @@
 import AuthForgotForm from "./AuthForgotForm";
 import AuthImageSlider from "./AuthImageSlider";
 import AuthLoginForm from "./AuthLoginForm";
+import AuthActivationModal from "./AuthActivationModal";
 import AuthResetSuccessModal from "./AuthResetSuccessModal";
 import { AuthPopupProps } from "./types";
 import { useAuthForm } from "./useAuthForm";
@@ -75,6 +76,13 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: AuthPopupP
               form.setShowResetPopup(false);
               form.setMode("login");
             }}
+          />
+        )}
+
+        {form.showActivationPopup && (
+          <AuthActivationModal
+            email={form.email}
+            onClose={() => form.setShowActivationPopup(false)}
           />
         )}
       </div>

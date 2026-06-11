@@ -71,6 +71,23 @@ export async function logout() {
   }
 }
 
+export class AccountNotActivatedError extends Error {
+  constructor(message = "You haven't activated your email yet.") {
+    super(message);
+    this.name = "AccountNotActivatedError";
+  }
+}
+
+function parseApiError(text: string): string {
+  try {
+    const parsed = JSON.parse(text) as { error?: string };
+    if (parsed.error) return parsed.error;
+  } catch {
+    // plain-text body
+  }
+  return text;
+}
+
 export async function login(email: string, password: string, rememberMe: boolean): Promise<boolean> {
   try {
     const res = await api("/api/auth/login", {
@@ -80,8 +97,12 @@ export async function login(email: string, password: string, rememberMe: boolean
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
+      const raw = await res.text();
+      const message = parseApiError(raw);
+      if (res.status === 412 || message.toLowerCase().includes("not activated")) {
+        throw new AccountNotActivatedError(message);
+      }
+      throw new Error(message);
     }
 
     const data = await res.json();
@@ -134,6 +155,25 @@ export async function register(
     return true;
   } catch (err) {
     console.error("Register error:", err);
+    throw err;
+  }
+}
+
+export async function resendActivationEmail(email: string): Promise<boolean> {
+  try {
+    const res = await api(
+      `/api/auth/resend-activation?email=${encodeURIComponent(email)}`,
+      { method: "POST" }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Resend activation error:", err);
     throw err;
   }
 }

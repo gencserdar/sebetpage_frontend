@@ -92,7 +92,10 @@ export default function ActivatePage() {
         {status === "error" && (
           <>
             <h2 className="text-2xl font-bold mb-4">Activation failed</h2>
-            <p className="text-red-400 mb-6 text-sm">{error}</p>
+            <p className="text-red-400 mb-4 text-sm">{error}</p>
+            <p className="text-gray-400 text-sm mb-6">
+              The link may have expired. Log in to request a new activation email.
+            </p>
             <Link
               to="/?login=1"
               className="inline-block w-full px-6 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-semibold transition-colors"

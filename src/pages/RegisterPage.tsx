@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import PasswordRequirements from "../components/PasswordRequirements";
-import { register } from "../services/authService";
+import { register, resendActivationEmail } from "../services/authService";
 import { isPasswordValid } from "../utils/passwordPolicy";
 
 export default function RegisterPage() {
@@ -14,6 +14,9 @@ export default function RegisterPage() {
   const [error, setError]           = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +64,49 @@ export default function RegisterPage() {
       {registered ? (
         <div className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-xl p-8 text-center">
           <h2 className="text-2xl font-bold mb-4">Check Your Email</h2>
-          <p className="text-gray-300 mb-6">
+          <p className="text-gray-300 mb-4">
             We&apos;ve sent you a confirmation link. Please verify your email to log in.
           </p>
+          <p className="text-gray-400 text-sm mb-6">
+            The link expires in 24 hours. Didn&apos;t get it?
+          </p>
+          {resendSent ? (
+            <p className="text-green-400 text-sm mb-6">
+              If an unactivated account exists for {email}, a new link was sent.
+            </p>
+          ) : (
+            <>
+              {resendError && (
+                <p className="text-red-400 text-sm mb-4">{resendError}</p>
+              )}
+              <button
+                type="button"
+                disabled={resending}
+                onClick={async () => {
+                  if (resending) return;
+                  setResendError("");
+                  setResending(true);
+                  try {
+                    await resendActivationEmail(email);
+                    setResendSent(true);
+                  } catch (err: unknown) {
+                    setResendError(
+                      err instanceof Error ? err.message : "Could not resend link"
+                    );
+                  } finally {
+                    setResending(false);
+                  }
+                }}
+                className="w-full px-6 py-2 mb-4 bg-white/10 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-semibold transition-colors flex items-center justify-center min-h-[40px]"
+              >
+                {resending ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  "Resend activation link"
+                )}
+              </button>
+            </>
+          )}
           <button
             onClick={() => (window.location.href = "/")}
             className="w-full px-6 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-semibold transition-colors"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useUser } from "../../../context/UserContext";
+import { AccountNotActivatedError } from "../../../services/authService";
 import { AuthMode } from "./types";
 
 interface UseAuthFormParams {
@@ -14,6 +15,7 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [showResetPopup, setShowResetPopup] = useState(false);
+  const [showActivationPopup, setShowActivationPopup] = useState(false);
 
   const { login, forgotPassword } = useUser();
 
@@ -41,8 +43,12 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
       if (success) {
         onSubmit();
       }
-    } catch (err: any) {
-      setError(err.message || "Request failed");
+    } catch (err: unknown) {
+      if (err instanceof AccountNotActivatedError) {
+        setShowActivationPopup(true);
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Request failed");
     }
   };
 
@@ -60,6 +66,8 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
     setMode,
     showResetPopup,
     setShowResetPopup,
+    showActivationPopup,
+    setShowActivationPopup,
     handleSubmit,
     title,
   };
