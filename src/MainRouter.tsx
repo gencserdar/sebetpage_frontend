@@ -8,6 +8,7 @@ import {
 
 import HomePage from "./pages/HomePage";
 import RegisterPage from "./pages/RegisterPage";
+import ActivatePage from "./pages/ActivatePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ProtectedAuthRoute from "./routes/ProtectedAuthRoute";
 
@@ -24,6 +25,7 @@ export default function MainRouter() {
             </ProtectedAuthRoute>
           }
         />
+        <Route path="/activate" element={<ActivatePage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/profile/:nickname" element={<HomePage />} />
         <Route path="/community/:id" element={<HomePage />} />

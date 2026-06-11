@@ -138,6 +138,24 @@ export async function register(
   }
 }
 
+export async function activateAccount(code: string): Promise<boolean> {
+  try {
+    const res = await api(`/api/auth/activate?code=${encodeURIComponent(code)}`, {
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Activate error:", err);
+    throw err;
+  }
+}
+
 export async function forgotPassword(email: string): Promise<boolean> {
   try {
     const res = await api(`/api/auth/forgot-password?email=${encodeURIComponent(email)}`, {
