@@ -1,4 +1,6 @@
 import { Check, X } from "lucide-react";
+import PasswordRequirements from "../PasswordRequirements";
+import { isPasswordValid } from "../../utils/passwordPolicy";
 
 export interface ProfilePasswordFormProps {
   currentPassword: string;
@@ -74,32 +76,43 @@ export default function ProfilePasswordForm({
           name="profile-current-password"
           className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
         />
-        <input
-          type="password"
-          placeholder="New password"
-          value={newPassword}
-          onChange={(e) => onNewPasswordChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Escape" && onCancel()}
-          autoComplete="new-password"
-          name="profile-new-password"
-          className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
-        />
-        <input
-          type="password"
-          placeholder="Confirm new password"
-          value={confirmPassword}
-          onChange={(e) => onConfirmPasswordChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              onSubmit();
-            } else if (e.key === "Escape") {
-              onCancel();
-            }
-          }}
-          autoComplete="new-password"
-          name="profile-confirm-password"
-          className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
-        />
+        <div className="space-y-2">
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => onNewPasswordChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && onCancel()}
+            autoComplete="new-password"
+            name="profile-new-password"
+            className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
+          />
+          <PasswordRequirements password={newPassword} />
+        </div>
+        <div className="space-y-2">
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => onConfirmPasswordChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onSubmit();
+              } else if (e.key === "Escape") {
+                onCancel();
+              }
+            }}
+            autoComplete="new-password"
+            name="profile-confirm-password"
+            className="bg-white/10 text-white rounded-lg px-4 py-3 w-full border border-white/20 focus:border-white/40 focus:outline-none transition-colors duration-200 backdrop-blur-sm"
+          />
+          <PasswordRequirements
+            password={newPassword}
+            confirmPassword={confirmPassword}
+            matchOnly
+            visible={confirmPassword.length > 0}
+          />
+        </div>
       </div>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -107,8 +120,13 @@ export default function ProfilePasswordForm({
       <div className="flex gap-3">
         <button
           type="submit"
-          className="flex-1 bg-indigo-500/80 hover:bg-indigo-500 p-3 rounded-lg text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
-          disabled={loading}
+          className="flex-1 bg-indigo-500/80 hover:bg-indigo-500 disabled:bg-indigo-500/40 disabled:cursor-not-allowed p-3 rounded-lg text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
+          disabled={
+            loading ||
+            !currentPassword ||
+            !isPasswordValid(newPassword) ||
+            newPassword !== confirmPassword
+          }
         >
           {loading ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

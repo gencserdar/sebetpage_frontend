@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import PasswordRequirements from "../components/PasswordRequirements";
 import { register } from "../services/authService";
+import { isPasswordValid } from "../utils/passwordPolicy";
 
 export default function RegisterPage() {
   const [firstName, setFirst]       = useState("");
@@ -16,6 +18,10 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
+    if (!isPasswordValid(password)) {
+      setError("Please meet all password requirements");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -75,22 +81,39 @@ export default function RegisterPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none"
-            value={confirmPassword}
-            onChange={(e) => setConf(e.target.value)}
-            required
-          />
+          <div className="space-y-2">
+            <input
+              type="password"
+              placeholder="Password"
+              className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError("");
+              }}
+              required
+            />
+            <PasswordRequirements password={password} />
+          </div>
+          <div className="space-y-2">
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConf(e.target.value);
+                if (error) setError("");
+              }}
+              required
+            />
+            <PasswordRequirements
+              password={password}
+              confirmPassword={confirmPassword}
+              matchOnly
+              visible={confirmPassword.length > 0}
+            />
+          </div>
           <input
             type="text"
             placeholder="Username"
@@ -102,7 +125,12 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            className="w-full bg-indigo-500 hover:bg-indigo-600 py-2 rounded-lg font-semibold"
+            disabled={
+              !isPasswordValid(password) ||
+              !confirmPassword ||
+              password !== confirmPassword
+            }
+            className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-indigo-500/40 py-2 rounded-lg font-semibold transition-colors"
           >
             Sign Up
           </button>

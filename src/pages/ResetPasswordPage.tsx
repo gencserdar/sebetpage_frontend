@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import PasswordRequirements from "../components/PasswordRequirements";
 import { resetPassword } from "../services/authService";
+import { isPasswordValid } from "../utils/passwordPolicy";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -16,6 +18,10 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError(null);
 
+    if (!isPasswordValid(password)) {
+      setError("Please meet all password requirements");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -46,25 +52,47 @@ export default function ResetPasswordPage() {
         {success && <p className="text-green-400 mb-3 text-center">Password has been reset successfully!</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="password"
-            placeholder="New Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md bg-[#2c2c2c] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#635bff]"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Confirm New Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full rounded-md bg-[#2c2c2c] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#635bff]"
-            required
-          />
+          <div className="space-y-2">
+            <input
+              type="password"
+              placeholder="New Password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError(null);
+              }}
+              className="w-full rounded-md bg-[#2c2c2c] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#635bff]"
+              required
+            />
+            <PasswordRequirements password={password} />
+          </div>
+          <div className="space-y-2">
+            <input
+              type="password"
+              placeholder="Confirm New Password"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (error) setError(null);
+              }}
+              className="w-full rounded-md bg-[#2c2c2c] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#635bff]"
+              required
+            />
+            <PasswordRequirements
+              password={password}
+              confirmPassword={confirmPassword}
+              matchOnly
+              visible={confirmPassword.length > 0}
+            />
+          </div>
           <button
             type="submit"
-            className="w-full py-2 rounded-md bg-[#635bff] hover:bg-[#5146ff] transition font-medium"
+            disabled={
+              !isPasswordValid(password) ||
+              !confirmPassword ||
+              password !== confirmPassword
+            }
+            className="w-full py-2 rounded-md bg-[#635bff] hover:bg-[#5146ff] disabled:cursor-not-allowed disabled:bg-[#635bff]/40 transition font-medium"
           >
             Reset Password
           </button>
