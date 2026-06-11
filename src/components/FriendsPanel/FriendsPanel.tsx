@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { Settings, X } from "lucide-react";
 import FriendsList from "./FriendsList";
-import GroupSettingsModal from "./GroupSettingsModal";
+import GroupSettingsModal from "./GroupSettingsModal/index";
 import { UserDTO } from "../../types/userDTO";
 import { chatApiService, MessagingGroup, MessagingGroupDetail } from "../../services/chatApiService";
 import { useUser } from "../../context/UserContext";

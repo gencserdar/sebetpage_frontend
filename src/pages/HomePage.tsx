@@ -10,7 +10,7 @@ import { getUserByNickname, getUserById } from "../services/userService";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
 import FriendChat from "../components/FriendsPanel/FriendChat/index";
-import GroupChat from "../components/FriendsPanel/GroupChat";
+import GroupChat from "../components/FriendsPanel/GroupChat/index";
 import ExpandedMessagesRail from "../components/FriendsPanel/ExpandedMessagesRail";
 import { useChatSocketContext } from "../context/ChatSocketContext";
 import { MessagingGroup, MessagingGroupDetail } from "../services/chatApiService";
