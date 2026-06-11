@@ -74,6 +74,7 @@ export function useGroupChat({
     sendToConversation,
     markRead,
     subscribeFriendEvents,
+    subscribeUserUpdates,
   } = useChatSocketContext();
 
   useEffect(() => {
@@ -136,6 +137,43 @@ export function useGroupChat({
       }
     });
   }, [conversationId, loadDetail, onClose, onGroupDeleted, subscribeFriendEvents]);
+
+  useEffect(() => {
+    return subscribeUserUpdates((u: any) => {
+      const uid = Number(u?.id);
+      if (!Number.isFinite(uid)) return;
+      if (!detailRef.current?.participants.some((p) => p.userId === uid)) return;
+
+      if (u.nickname) {
+        setNicknames((prev) => {
+          const next = new Map(prev);
+          next.set(uid, String(u.nickname));
+          return next;
+        });
+      }
+
+      setDetail((prev) => {
+        if (!prev) return prev;
+        const patchParticipant = (p: (typeof prev.participants)[number]) =>
+          p.userId === uid
+            ? {
+                ...p,
+                nickname: u.nickname ?? p.nickname,
+                name: u.name ?? p.name,
+                surname: u.surname ?? p.surname,
+                profileImageUrl: u.profileImageUrl ?? p.profileImageUrl,
+              }
+            : p;
+        const next = {
+          ...prev,
+          participants: prev.participants.map(patchParticipant),
+          knownParticipants: prev.knownParticipants?.map(patchParticipant),
+        };
+        detailRef.current = next;
+        return next;
+      });
+    });
+  }, [subscribeUserUpdates]);
 
   const displayName = detail?.title?.trim() || title?.trim() || "Group";
   const participantIds = useMemo(

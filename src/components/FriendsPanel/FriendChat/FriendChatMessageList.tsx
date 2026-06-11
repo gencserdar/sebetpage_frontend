@@ -1,6 +1,7 @@
 import ChatBubble from "./ChatBubble";
 import DaySeparator from "./DaySeparator";
 import { RenderItem } from "./types";
+import { useState } from "react";
 interface FriendChatMessageListProps {
   listRef: React.RefObject<HTMLDivElement | null>;
   expanded: boolean;
@@ -20,6 +21,12 @@ export default function FriendChatMessageList({
   myUserId,
   seenMyMessageId,
 }: FriendChatMessageListProps) {
+  const [timeVisibleMessageId, setTimeVisibleMessageId] = useState<number | null>(null);
+
+  const toggleTimeFor = (messageId: number) => {
+    setTimeVisibleMessageId((prev) => (prev === messageId ? null : messageId));
+  };
+
   const groups: React.ReactElement[] = [];
   let currentDayLabel: string | null = null;
   let currentMessages: React.ReactElement[] = [];
@@ -43,6 +50,8 @@ export default function FriendChatMessageList({
           message={it.data}
           myUserId={myUserId}
           seenMyMessageId={seenMyMessageId}
+          showTime={timeVisibleMessageId === it.data.id}
+          onToggleTime={() => toggleTimeFor(it.data.id)}
         />
       );
     }

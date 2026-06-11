@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { WsMessageDTO } from "../../../types/WSMessageDTO";
 import { fmtTime } from "./chatUtils";
 
@@ -6,14 +5,17 @@ interface ChatBubbleProps {
   message: WsMessageDTO;
   myUserId: number | null;
   seenMyMessageId: number | null;
+  showTime: boolean;
+  onToggleTime: () => void;
 }
 
 export default function ChatBubble({
   message: m,
   myUserId,
   seenMyMessageId,
+  showTime,
+  onToggleTime,
 }: ChatBubbleProps) {
-  const [showTime, setShowTime] = useState(false);
   const mine = m.senderId === myUserId;
   const bubbleCls = mine
     ? "bg-indigo-500/80 text-white border border-indigo-400/20"
@@ -24,17 +26,28 @@ export default function ChatBubble({
       <div className={`w-full flex flex-col ${mine ? "items-end" : "items-start"}`}>
         <button
           type="button"
-          onClick={() => setShowTime((prev) => !prev)}
+          onClick={onToggleTime}
           className={`inline-block break-words rounded-2xl px-3 py-1 shadow-lg backdrop-blur-sm text-left cursor-pointer ${bubbleCls}`}
           style={{ maxWidth: "90%" }}
         >
           {m.content}
         </button>
-        {showTime && (
-          <div className={`mt-1 text-[11px] text-gray-500 ${mine ? "text-right" : "text-left"}`}>
-            {fmtTime(m.createdAt)}
+        <div
+          className={`grid w-full transition-[grid-template-rows] duration-200 ease-out ${
+            showTime ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          } ${mine ? "justify-items-end" : "justify-items-start"}`}
+          style={{ maxWidth: "90%" }}
+        >
+          <div className="overflow-hidden">
+            <div
+              className={`pt-1 text-[11px] text-gray-500 transition-opacity duration-200 ease-out ${
+                showTime ? "opacity-100" : "opacity-0"
+              } ${mine ? "text-right" : "text-left"}`}
+            >
+              {fmtTime(m.createdAt)}
+            </div>
           </div>
-        )}
+        </div>
         {mine && seenMyMessageId === m.id && (
           <div className="mt-1 text-[11px] text-indigo-300/80 text-right">Seen</div>
         )}

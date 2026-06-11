@@ -55,7 +55,7 @@ export function useGroupSettings({
   const permissionSyncingRef = useRef<Set<number>>(new Set());
 
   const navigate = useNavigate();
-  const { subscribeFriendEvents, getUserOnlineStatus } = useChatSocketContext();
+  const { subscribeFriendEvents, subscribeUserUpdates, getUserOnlineStatus } = useChatSocketContext();
 
   useEffect(() => {
     editingTitleRef.current = editingTitle;
@@ -225,6 +225,35 @@ export function useGroupSettings({
       }
     });
   }, [open, subscribeFriendEvents]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    return subscribeUserUpdates((u: any) => {
+      const uid = Number(u?.id);
+      if (!Number.isFinite(uid)) return;
+      if (!detailRef.current?.participants.some((p) => p.userId === uid)) return;
+
+      const patchParticipant = (p: MessagingGroupParticipant): MessagingGroupParticipant =>
+        p.userId === uid
+          ? {
+              ...p,
+              nickname: u.nickname ?? p.nickname,
+              name: u.name ?? p.name,
+              surname: u.surname ?? p.surname,
+              profileImageUrl: u.profileImageUrl ?? p.profileImageUrl,
+            }
+          : p;
+
+      applyDetail(
+        {
+          ...detailRef.current!,
+          me: patchParticipant(detailRef.current!.me),
+          participants: detailRef.current!.participants.map(patchParticipant),
+        },
+        { resetDrafts: false }
+      );
+    });
+  }, [open, applyDetail, subscribeUserUpdates]);
 
   const me = detail?.me;
   const isCreator = !!detail && detail.createdById === detail.me.userId;
