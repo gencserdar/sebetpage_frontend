@@ -5,6 +5,17 @@
 
 import { api } from "./apiService";
 
+function parseApiError(raw: string, fallback: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return fallback;
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: string; message?: string };
+    return parsed.error || parsed.message || trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
 export interface MessagingGroup {
   id: number;
   type: string;
@@ -72,7 +83,10 @@ class ChatApiService {
     const res = await api(`${this.groupBaseUrl}/${groupId}`);
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(err || "Failed to get messaging group");
+      const message = parseApiError(err, "Failed to get messaging group");
+      const error = new Error(message) as Error & { status?: number };
+      error.status = res.status;
+      throw error;
     }
     return res.json();
   }

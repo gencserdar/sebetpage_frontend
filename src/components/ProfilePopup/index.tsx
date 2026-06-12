@@ -1,9 +1,10 @@
+import { createPortal } from "react-dom";
+import { useEffect, useRef } from "react";
+import { ChevronDown } from "lucide-react";
 import { useUser } from "../../context/UserContext";
 import ProfileConfirmationModal from "./ProfileConfirmationModal";
-import FreezeAccountConfirmModal from "../FreezeAccountConfirmModal";
 import ProfilePreviewPanel from "./ProfilePreviewPanel";
-import ProfileSettingsPanel from "./ProfileSettingsPanel";
-import ProfileVerifyModal from "./ProfileVerifyModal";
+import ProfileCardView from "../ProfileCard/ProfileCardView";
 import { ProfilePopupProps } from "./types";
 import { useProfileEditing } from "./useProfileEditing";
 import { useProfileSocial } from "./useProfileSocial";
@@ -12,73 +13,91 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const { user: currentUser } = useUser();
   const editing = useProfileEditing({ user, onClose });
   const isOwnProfile = currentUser?.id === editing.localUser.id;
+  const isFrozenLimited = !isOwnProfile && !!editing.localUser.frozen;
+  const canvasPageRef = useRef<HTMLDivElement>(null);
 
   const social = useProfileSocial({
     profileUser: editing.localUser,
     isOwnProfile,
+    enabled: !isFrozenLimited,
     setError: editing.setError,
   });
 
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
+  const scrollToCanvas = () => {
+    canvasPageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-5 backdrop-blur-sm sm:p-6 lg:p-4"
+      onClick={editing.handleClose}
+    >
       <div
-        className={`bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl h-[740px] flex overflow-hidden border border-white/20 transition-all duration-300 ${
-          isOwnProfile ? "w-full max-w-6xl" : "w-full max-w-md justify-center"
-        }`}
+        className="relative flex h-[calc(100dvh-3.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/15 bg-[#101018]/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:h-[min(740px,calc(100dvh-4rem))] lg:h-[min(740px,92vh)] lg:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        {isOwnProfile && (
-          <ProfileSettingsPanel
-            editField={editing.editField}
-            error={editing.error}
-            loading={editing.loading}
-            updatedFields={editing.updatedFields}
-            currentPassword={editing.currentPassword}
-            newPassword={editing.newPassword}
-            confirmPassword={editing.confirmPassword}
-            getFieldValue={editing.getFieldValue}
-            onClose={editing.handleClose}
-            onStartEditing={editing.startEditing}
-            onCancelEditing={editing.cancelEditing}
-            onFieldChange={editing.handleChange}
-            onFieldSubmit={editing.handleSubmit}
-            onCurrentPasswordChange={editing.setCurrentPassword}
-            onNewPasswordChange={editing.setNewPassword}
-            onConfirmPasswordChange={editing.setConfirmPassword}
-            onPasswordSubmit={editing.handlePasswordSubmit}
-            onPasswordCancel={() => editing.cancelEditing("password")}
-            onFreezeAccount={editing.handleFreezeAccount}
-            freezeLoading={editing.freezeLoading}
-          />
-        )}
+        <div className="profile-popup-pager flex min-h-0 min-w-0 flex-1 flex-col lg:h-full lg:w-full lg:flex-row lg:items-stretch lg:overflow-hidden">
+          <div className="profile-popup-page flex h-full w-full shrink-0 flex-col bg-white/5 lg:h-auto lg:w-80 lg:flex-none lg:overflow-hidden lg:bg-transparent">
+            <div className="flex min-h-0 flex-1 flex-col touch-pan-y lg:h-full lg:overflow-y-auto lg:indigo-scrollbar">
+              <ProfilePreviewPanel
+                user={editing.localUser}
+                isOwnProfile={isOwnProfile}
+                isFrozenLimited={isFrozenLimited}
+                loading={editing.loading}
+                updatedFields={editing.updatedFields}
+                error={editing.error}
+                friendStatus={social.friendStatus}
+                isBlocked={social.isBlocked}
+                blockStatusLoaded={social.blockStatusLoaded}
+                blockLoading={social.blockLoading}
+                onClose={editing.handleClose}
+                onPhotoUpload={editing.handlePhotoUpload}
+                onAddFriend={social.handleAddFriend}
+                onCancelRequest={social.showCancelRequestConfirmation}
+                onRemoveFriend={social.showRemoveFriendConfirmation}
+                onAcceptRequest={social.handleAcceptRequest}
+                onRejectRequest={social.handleRejectRequest}
+                onBlockToggle={social.showBlockConfirmation}
+              />
+            </div>
 
-        <ProfilePreviewPanel
-          user={editing.localUser}
-          isOwnProfile={isOwnProfile}
-          loading={editing.loading}
-          updatedFields={editing.updatedFields}
-          error={editing.error}
-          friendStatus={social.friendStatus}
-          isBlocked={social.isBlocked}
-          blockStatusLoaded={social.blockStatusLoaded}
-          blockLoading={social.blockLoading}
-          onClose={editing.handleClose}
-          onPhotoUpload={editing.handlePhotoUpload}
-          onAddFriend={social.handleAddFriend}
-          onCancelRequest={social.showCancelRequestConfirmation}
-          onRemoveFriend={social.showRemoveFriendConfirmation}
-          onAcceptRequest={social.handleAcceptRequest}
-          onRejectRequest={social.handleRejectRequest}
-          onBlockToggle={social.showBlockConfirmation}
-        />
+            {!isFrozenLimited && (
+              <button
+                type="button"
+                onClick={scrollToCanvas}
+                className="flex shrink-0 touch-manipulation flex-col items-center gap-0.5 border-t border-white/10 py-3 text-gray-500 transition active:text-gray-300 lg:hidden"
+                aria-label="Go to canvas"
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-widest">Canvas</span>
+                <ChevronDown size={18} aria-hidden />
+              </button>
+            )}
+          </div>
+
+          <div
+            ref={canvasPageRef}
+            className="profile-popup-page flex h-full w-full min-h-0 flex-col bg-white/5 lg:w-0 lg:flex-1 lg:overflow-hidden lg:border-l lg:border-white/10 lg:bg-black/20"
+          >
+            <ProfileCardView
+              userId={editing.localUser.id}
+              isOwnProfile={isOwnProfile}
+              isFrozenLimited={isFrozenLimited}
+              nickname={editing.localUser.nickname}
+            />
+          </div>
+        </div>
       </div>
-
-      {editing.freezeConfirmOpen && (
-        <FreezeAccountConfirmModal
-          loading={editing.freezeLoading}
-          onClose={editing.closeFreezeConfirm}
-          onConfirm={editing.confirmFreezeAccount}
-        />
-      )}
 
       {social.confirmationModal?.isOpen && (
         <ProfileConfirmationModal
@@ -86,18 +105,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           onClose={social.closeConfirmationModal}
         />
       )}
-
-      {editing.verify && (
-        <ProfileVerifyModal
-          verify={editing.verify}
-          verifyCode={editing.verifyCode}
-          verifyError={editing.verifyError}
-          verifySending={editing.verifySending}
-          onVerifyCodeChange={editing.setVerifyCode}
-          onSubmit={editing.handleVerifySubmit}
-          onCancel={editing.handleVerifyCancel}
-        />
-      )}
-    </div>
+    </div>,
+    document.body
   );
 }

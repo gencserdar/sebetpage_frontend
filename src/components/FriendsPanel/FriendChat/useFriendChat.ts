@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useChatSocketContext } from "../../../context/ChatSocketContext";
+import { useProfileNavigation } from "../../../hooks/useProfileNavigation";
 import { getFriends } from "../../../services/friendService";
 import { WsMessageDTO } from "../../../types/WSMessageDTO";
 import { UserDTO } from "../../../types/userDTO";
@@ -67,7 +67,7 @@ export function useFriendChat({
     markRead,
   } = useChatSocketContext();
 
-  const navigate = useNavigate();
+  const { openProfile } = useProfileNavigation();
 
   useEffect(() => {
     setIsExpanded(initialExpanded);
@@ -94,8 +94,8 @@ export function useFriendChat({
   }, [messages]);
 
   const openFriendProfile = useCallback(() => {
-    navigate(`/profile/${friendNickname}`, { state: { fallbackId: friendUserId } });
-  }, [navigate, friendNickname, friendUserId]);
+    openProfile(friendNickname, friendUserId);
+  }, [openProfile, friendNickname, friendUserId]);
 
   useEffect(() => {
     if (!showAddPanel) return;

@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import GroupSettingsActionsSection from "./GroupSettingsActionsSection";
 import GroupSettingsDeleteConfirm from "./GroupSettingsDeleteConfirm";
 import GroupSettingsDescriptionSection from "./GroupSettingsDescriptionSection";
@@ -14,8 +15,11 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
 
   if (!props.open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onClick={settings.close}
+    >
       <style>
         {`
           .group-settings-scroll::-webkit-scrollbar { width: 8px; }
@@ -24,11 +28,15 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
           .group-settings-scroll::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.8); }
         `}
       </style>
-      <div className="relative flex h-[82vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 text-white shadow-2xl">
+      <div
+        className="relative flex h-[82vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 text-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
         <GroupSettingsHeader onClose={settings.close} />
 
         <div
-          className="group-settings-scroll flex-1 overflow-y-auto"
+          className="group-settings-scroll relative z-0 flex-1 overflow-y-auto overscroll-contain"
           style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.55) rgba(3,7,18,.75)" }}
         >
           {settings.detail ? (
@@ -124,7 +132,9 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
           ) : settings.loading ? (
             <div className="h-full min-h-[520px]" />
           ) : (
-            <div className="py-8 text-center text-gray-500">Group not found.</div>
+            <div className="px-6 py-8 text-center text-gray-400">
+              <p>{settings.error || "Could not load this group."}</p>
+            </div>
           )}
         </div>
       </div>
@@ -138,6 +148,7 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
           onConfirm={settings.deleteGroup}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

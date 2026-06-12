@@ -1,44 +1,83 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
+import { useProfileNavigation } from "../../hooks/useProfileNavigation";
 import { searchUsersAndGroups } from "../../services/searchService";
 import { SearchResponse, SearchResult } from "../../types/searchTypes";
 
 type SearchFilter = "users" | "communities";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  embedded?: boolean;
+  onResultSelect?: () => void;
+}
+
+export default function SearchBar({ embedded = false, onResultSelect }: SearchBarProps) {
   const navigate = useNavigate();
+  const { openProfile } = useProfileNavigation();
   const { user } = useUser();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResponse>({ users: [], communities: [] });
+  const [searchResults, setSearchResults] = useState<SearchResponse>({
+    users: [],
+    communities: [],
+  });
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("users");
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchPlaceholder, setSearchPlaceholder] = useState("Search users and communities...");
 
-  const performSearch = useCallback(async (query: string) => {
-    if (!user) return;
-
-    setSearchLoading(true);
-    try {
-      const data = await searchUsersAndGroups(query);
-      setSearchResults(data);
-    } catch (error) {
-      console.error("Search failed:", error);
-    } finally {
-      setSearchLoading(false);
+  useEffect(() => {
+    if (embedded) {
+      setSearchPlaceholder("Search users and communities...");
+      return undefined;
     }
-  }, [user]);
+
+    const xl = window.matchMedia("(min-width: 1280px)");
+    const lg = window.matchMedia("(min-width: 1024px)");
+
+    const syncPlaceholder = () => {
+      if (xl.matches) setSearchPlaceholder("Search users and communities...");
+      else if (lg.matches) setSearchPlaceholder("Search users...");
+      else setSearchPlaceholder("Search");
+    };
+
+    syncPlaceholder();
+    xl.addEventListener("change", syncPlaceholder);
+    lg.addEventListener("change", syncPlaceholder);
+    return () => {
+      xl.removeEventListener("change", syncPlaceholder);
+      lg.removeEventListener("change", syncPlaceholder);
+    };
+  }, [embedded]);
+
+  const performSearch = useCallback(
+    async (query: string) => {
+      if (!user) return;
+
+      setSearchLoading(true);
+      try {
+        const data = await searchUsersAndGroups(query);
+        setSearchResults(data);
+      } catch (error) {
+        console.error("Search failed:", error);
+      } finally {
+        setSearchLoading(false);
+      }
+    },
+    [user]
+  );
 
   useEffect(() => {
     if (!user) return;
 
     const timeoutId = setTimeout(() => {
       if (searchQuery.trim().length >= 1) {
-        performSearch(searchQuery);
+        void performSearch(searchQuery);
       } else if (searchDropdownOpen && searchQuery.trim().length === 0) {
         setSearchResults({ users: [], communities: [] });
       }
@@ -47,11 +86,9 @@ export default function SearchBar() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, user, performSearch, searchDropdownOpen]);
 
-  const handleSearchFocus = () => {
-    setSearchDropdownOpen(true);
-  };
-
   useEffect(() => {
+    if (embedded) return undefined;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setSearchDropdownOpen(false);
@@ -60,16 +97,21 @@ export default function SearchBar() {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [embedded]);
+
+  const handleSearchFocus = () => {
+    setSearchDropdownOpen(true);
+  };
 
   const handleResultClick = (result: SearchResult) => {
     if (result.type === "USER") {
-      navigate(`/profile/${result.nickname}`, { state: { fallbackId: result.id } });
+      openProfile(result.nickname, Number(result.id));
     } else {
       navigate(`/community/${result.id}`);
     }
     setSearchDropdownOpen(false);
     setSearchQuery("");
+    onResultSelect?.();
   };
 
   const getFilteredResults = () => {
@@ -94,7 +136,7 @@ export default function SearchBar() {
       return (
         <div className="p-4 text-center text-gray-400">
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
             <span>Searching...</span>
           </div>
         </div>
@@ -104,44 +146,47 @@ export default function SearchBar() {
     if (!hasResults && searchQuery.trim().length >= 1) {
       return (
         <div className="p-4 text-center text-gray-400">
-          No results found for "{searchQuery}"
+          No results found for &quot;{searchQuery}&quot;
         </div>
       );
     }
 
     if (searchQuery.trim().length === 0) {
       return (
-        <div className="p-4 text-center text-gray-400">
+        <div className="p-4 text-center text-sm text-gray-400">
           Start typing to search for users and communities
         </div>
       );
     }
 
     return (
-      <div className="max-h-96 overflow-y-auto">
+      <div className="indigo-scrollbar max-h-56 overflow-y-auto sm:max-h-72">
         {users.length > 0 && (
           <div>
-            {users.map((user) => (
+            {users.map((result) => (
               <button
-                key={`user-${user.id}`}
-                onClick={() => handleResultClick(user)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700/50 transition-colors text-left"
+                key={`user-${result.id}`}
+                type="button"
+                onClick={() => handleResultClick(result)}
+                className="flex w-full min-h-[3rem] items-center gap-3 px-4 py-2 text-left transition-colors active:bg-white/10"
               >
-                <div className="w-10 h-10 p-0.5 bg-gradient-to-r from-orange-500 to-pink-500 rounded-full">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-r from-orange-500 to-pink-500 p-0.5">
+                  <div className="h-full w-full overflow-hidden rounded-full bg-gray-800">
                     <img
-                      src={user.profileImageUrl || "https://via.placeholder.com/300"}
+                      src={result.profileImageUrl || "https://via.placeholder.com/300"}
                       alt="Profile"
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                   </div>
                 </div>
-                <div className="flex-1">
-                  <div className="font-medium">
-                    {user.name} {user.surname}, @{user.nickname || user.name.toLowerCase()}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">
+                    {result.name} {result.surname}, @{result.nickname || result.name.toLowerCase()}
                   </div>
                   <div className="text-sm text-gray-400">
-                    {user.mutualFriendCount > 0 ? `${user.mutualFriendCount} mutual friends` : "No mutual friends"}
+                    {result.mutualFriendCount > 0
+                      ? `${result.mutualFriendCount} mutual friends`
+                      : "No mutual friends"}
                   </div>
                 </div>
               </button>
@@ -154,14 +199,15 @@ export default function SearchBar() {
             {communities.map((community) => (
               <button
                 key={`community-${community.id}`}
+                type="button"
                 onClick={() => handleResultClick(community)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700/50 transition-colors text-left"
+                className="flex w-full min-h-[3rem] items-center gap-3 px-4 py-2 text-left transition-colors active:bg-white/10"
               >
-                <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-yellow-500 font-semibold text-white">
                   {community.name[0]}
                 </div>
-                <div className="flex-1">
-                  <div className="font-medium">{community.name}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{community.name}</div>
                   <div className="text-sm text-gray-400">
                     {community.mutualFriendCount > 0
                       ? `${community.mutualFriendCount} mutual friends in community`
@@ -176,63 +222,72 @@ export default function SearchBar() {
     );
   };
 
+  const renderDropdown = () =>
+    searchDropdownOpen ? (
+      <div
+        className={`${
+          embedded ? "relative mt-2" : "absolute left-0 right-0 top-full z-50 mt-2"
+        } overflow-hidden rounded-xl border border-gray-600 bg-gray-900 shadow-xl`}
+      >
+        <div className="flex border-b border-gray-700">
+          <button
+            type="button"
+            onClick={() => setSearchFilter("users")}
+            className={`min-h-[2.75rem] flex-1 px-4 text-sm font-medium transition-colors ${
+              searchFilter === "users"
+                ? "border-b-2 border-purple-400 bg-gray-800/50 text-purple-400"
+                : "text-gray-400 active:bg-white/5"
+            }`}
+          >
+            Users
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchFilter("communities")}
+            className={`min-h-[2.75rem] flex-1 px-4 text-sm font-medium transition-colors ${
+              searchFilter === "communities"
+                ? "border-b-2 border-purple-400 bg-gray-800/50 text-purple-400"
+                : "text-gray-400 active:bg-white/5"
+            }`}
+          >
+            Communities
+          </button>
+        </div>
+        {renderSearchResults()}
+      </div>
+    ) : null;
+
+  const renderSearchField = () => (
+    <div className="relative">
+      <Search
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+        aria-hidden
+      />
+      <input
+        ref={searchInputRef}
+        type="search"
+        name="navbar-search"
+        autoComplete="off"
+        spellCheck={false}
+        placeholder={searchPlaceholder}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onFocus={handleSearchFocus}
+        className="w-full min-w-0 rounded-xl border border-gray-600 bg-gray-800/50 py-3 pl-10 pr-4 text-base text-white placeholder-gray-400 focus:border-purple-500 focus:bg-gray-800 focus:outline-none md:rounded-full md:py-2 md:text-sm"
+      />
+      {renderDropdown()}
+    </div>
+  );
+
   if (!user) return null;
 
+  if (embedded) {
+    return <div className="px-5 py-4">{renderSearchField()}</div>;
+  }
+
   return (
-    <div ref={searchRef} className="relative mx-4">
-      <div className="relative">
-        <svg
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          ref={searchInputRef}
-          type="search"
-          name="navbar-search"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="Search users and communities..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onFocus={handleSearchFocus}
-          className="w-80 pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-600 rounded-full text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:bg-gray-800"
-        />
-      </div>
-
-      {searchDropdownOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50">
-          <div className="flex border-b border-gray-700">
-            <button
-              onClick={() => setSearchFilter("users")}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                searchFilter === "users"
-                  ? "text-purple-400 border-b-2 border-purple-400 bg-gray-800/50"
-                  : "text-gray-400 hover:text-gray-300"
-              }`}
-            >
-              Users
-            </button>
-            <button
-              onClick={() => setSearchFilter("communities")}
-              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                searchFilter === "communities"
-                  ? "text-purple-400 border-b-2 border-purple-400 bg-gray-800/50"
-                  : "text-gray-400 hover:text-gray-300"
-              }`}
-            >
-              Communities
-            </button>
-          </div>
-
-          {renderSearchResults()}
-        </div>
-      )}
+    <div ref={searchRef} className="relative mx-2 hidden md:block md:w-52 lg:mx-4 lg:w-72 xl:w-80">
+      {renderSearchField()}
     </div>
   );
 }

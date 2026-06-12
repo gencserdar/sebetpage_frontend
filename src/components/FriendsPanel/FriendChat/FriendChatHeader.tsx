@@ -94,7 +94,7 @@ export default function FriendChatHeader({
 
         <button
           onClick={onToggleExpanded}
-          className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-gray-800/60 rounded-lg p-1.5"
+          className="hidden rounded-lg p-1.5 text-gray-500 transition-colors duration-200 hover:bg-gray-800/60 hover:text-white md:block"
           title={isExpanded ? "Collapse" : "Expand"}
         >
           {isExpanded ? <CollapseIcon /> : <ExpandIcon />}

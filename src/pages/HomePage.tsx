@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
-import { MessageSquare } from "lucide-react"; // en üstte ekle
+import { useSearchParams } from "react-router-dom";
+import { MessageSquare } from "lucide-react";
 import Modal from "../components/Login/Modal";
 import AuthPopup from "../components/Login/AuthPopup/index";
-import ProfilePopup from "../components/ProfilePopup/index";
 import Navbar from "../components/Navbar/Navbar";
 import { useUser } from "../context/UserContext";
-import { getUserByNickname, getUserById } from "../services/userService";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
 import FriendChat from "../components/FriendsPanel/FriendChat/index";
@@ -16,9 +14,6 @@ import { useChatSocketContext } from "../context/ChatSocketContext";
 import { MessagingGroup, MessagingGroupDetail } from "../services/chatApiService";
 
 export default function HomePage() {
-  const navigate = useNavigate();
-  const { nickname } = useParams<{ nickname: string }>();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
   const { user, loading: userLoading } = useUser();
@@ -28,10 +23,6 @@ export default function HomePage() {
     participants: { id: number; nickname: string }[];
   } | null>(null);
   const [openNextExpanded, setOpenNextExpanded] = useState(false);
-
-  const [profilePopupOpen, setProfilePopupOpen] = useState(false);
-  const [profileUser, setProfileUser] = useState<UserDTO | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
 
   const [showFriendsPanel, setShowFriendsPanel] = useState(false);
   const [unreadTotal, setUnreadTotal] = useState(0);
@@ -55,77 +46,15 @@ export default function HomePage() {
     return () => unsub();
   }, [user, subscribeUnreadEvents]);
 
-  // Real-time entity sync — when someone we care about (open profile,
-  // selected chat partner, or ourselves on another tab) updates their
-  // profile fields, patch the local state without re-fetching.
+  // Real-time entity sync for the open chat partner.
   useEffect(() => {
     if (!user) return;
-    const unsub = subscribeUserUpdates((u: any) => {
+    const unsub = subscribeUserUpdates((u: Partial<UserDTO> & { id: number }) => {
       const uid = Number(u.id);
-      // Patch the friend currently in the chat tab so the header / nickname
-      // never go stale.
-      setSelectedFriend(prev => (prev && prev.id === uid ? { ...prev, ...u } : prev));
-      // Patch the open profile popup. Also keep the URL in sync if the
-      // nickname is the one we're routed to — saves the user from a 404 on
-      // refresh after someone else's rename.
-      setProfileUser(prev => {
-        if (!prev || prev.id !== uid) return prev;
-        const next = { ...prev, ...u };
-        if (nickname && prev.nickname === nickname && u.nickname && u.nickname !== nickname) {
-          navigate(`/profile/${u.nickname}`, { replace: true });
-        }
-        return next;
-      });
+      setSelectedFriend((prev) => (prev && prev.id === uid ? { ...prev, ...u } : prev));
     });
     return () => unsub();
-  }, [user, subscribeUserUpdates, nickname, navigate]);
-
-  const openProfilePopup = useCallback(
-    async (userNickname: string) => {
-      setProfileLoading(true);
-      try {
-        const userData = await getUserByNickname(userNickname);
-        setProfileUser(userData);
-        setProfilePopupOpen(true);
-      } catch (error) {
-        const fallbackId: number | undefined = (location.state as { fallbackId?: number })
-          ?.fallbackId;
-        if (fallbackId) {
-          try {
-            const fresh = await getUserById(fallbackId);
-            setProfileUser(fresh);
-            setProfilePopupOpen(true);
-            if (fresh.nickname && fresh.nickname !== userNickname) {
-              navigate(`/profile/${fresh.nickname}`, { replace: true });
-            }
-            return;
-          } catch (e2) {
-            console.error("Profile fallback by id failed:", e2);
-          }
-        }
-        console.error("Failed to fetch user profile:", error);
-        navigate("/");
-      } finally {
-        setProfileLoading(false);
-      }
-    },
-    [location.state, navigate]
-  );
-
-  useEffect(() => {
-    if (nickname && location.pathname.startsWith("/profile/")) {
-      openProfilePopup(nickname);
-    } else {
-      setProfilePopupOpen(false);
-      setProfileUser(null);
-    }
-  }, [nickname, location.pathname, openProfilePopup]);
-
-  const closeProfilePopup = () => {
-    setProfilePopupOpen(false);
-    setProfileUser(null);
-    navigate("/");
-  };
+  }, [user, subscribeUserUpdates]);
 
   const handleAuth = () => {
     setOpen(false);
@@ -135,10 +64,14 @@ export default function HomePage() {
     setOpen(true);
   };
 
+  const isMobileViewport = () =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+
   const selectFriend = useCallback((friend: UserDTO) => {
     setOpenNextExpanded(false);
     setSelectedGroupState(null);
     setSelectedFriend(friend);
+    if (isMobileViewport()) setShowFriendsPanel(false);
   }, []);
 
   const selectGroup = useCallback(
@@ -146,6 +79,7 @@ export default function HomePage() {
       setOpenNextExpanded(false);
       setSelectedFriend(null);
       setSelectedGroupState({ group, participants });
+      if (isMobileViewport()) setShowFriendsPanel(false);
     },
     []
   );
@@ -204,7 +138,11 @@ export default function HomePage() {
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Navbar */}
       <div className="transition-all duration-300">
-        <Navbar onAuthClick={handleAuthClick} />
+        <Navbar
+          onAuthClick={handleAuthClick}
+          onMessagesClick={() => setShowFriendsPanel(true)}
+          unreadCount={unreadTotal}
+        />
       </div>
 
       {/* Main content */}
@@ -236,7 +174,7 @@ export default function HomePage() {
           <button
             onClick={() => setShowFriendsPanel(true)}
             title="Friends"
-            className="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+            className="fixed bottom-5 right-5 z-40 hidden items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-white transition hover:bg-white/20 md:flex"
           >
             <MessageSquare size={20} />
             <span className="font-medium">Messages</span>
@@ -305,21 +243,6 @@ export default function HomePage() {
             onClose={() => setOpen(false)}
           />
         </Modal>
-      )}
-
-      {/* Profile Popup */}
-      {profilePopupOpen && profileUser && (
-        <ProfilePopup user={profileUser} onClose={closeProfilePopup} />
-      )}
-
-      {/* Profile Loading State */}
-      {profileLoading && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50">
-          <div className="flex items-center gap-3 text-white">
-            <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full"></div>
-            <span>Loading profile...</span>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -178,32 +178,35 @@ export default function FriendsPanel({
                 <div className="absolute inset-0 bg-black/40 transition-opacity" />
               </Transition.Child>
 
-              <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+              <div className="fixed inset-0 flex max-w-full md:inset-y-0 md:left-auto md:right-0 md:pl-10">
                 <Transition.Child
                   as={Fragment}
                   enter="transform transition ease-in-out duration-300"
-                  enterFrom="translate-x-full"
-                  enterTo="translate-x-0"
+                  enterFrom="translate-y-full md:translate-y-0 md:translate-x-full"
+                  enterTo="translate-y-0 md:translate-x-0"
                   leave="transform transition ease-in-out duration-200"
-                  leaveFrom="translate-x-0"
-                  leaveTo="translate-x-full"
+                  leaveFrom="translate-y-0 md:translate-x-0"
+                  leaveTo="translate-y-full md:translate-y-0 md:translate-x-full"
                 >
-                  <Dialog.Panel className="flex h-full w-[350px] flex-col border-l border-gray-800/40 bg-gray-950/98 text-white shadow-2xl backdrop-blur-xl">
+                  <Dialog.Panel className="flex h-full w-full flex-col border-gray-800/40 bg-gray-950/98 text-white shadow-2xl backdrop-blur-xl md:w-[350px] md:border-l">
                     <div className="flex items-center justify-between border-b border-gray-800/40 bg-gray-900/80 p-4">
                       <h2 className="text-lg font-semibold text-gray-100">Messages</h2>
                       <button
+                        type="button"
                         onClick={onClose}
-                        className="rounded-lg p-1 text-gray-500 transition-colors duration-200 hover:bg-gray-800/60 hover:text-white"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 transition-colors duration-200 hover:bg-gray-800/60 hover:text-white"
                         title="Close"
+                        aria-label="Close messages"
                       >
                         <X className="h-5 w-5" />
                       </button>
                     </div>
 
-                    <div className="flex justify-around border-b border-gray-800/40 bg-gray-900/50">
+                    <div className="flex border-b border-gray-800/40 bg-gray-900/50">
                       <button
+                        type="button"
                         onClick={() => setActiveTab("friends")}
-                        className={`flex flex-1 items-center justify-center px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                        className={`flex flex-1 items-center justify-center px-2 py-3 text-sm font-medium transition-all duration-200 ${
                           activeTab === "friends"
                             ? "border-b-2 border-indigo-400 bg-gray-900/60 text-white"
                             : "text-gray-500 hover:bg-gray-900/30 hover:text-gray-300"
@@ -213,8 +216,9 @@ export default function FriendsPanel({
                         <Badge count={friendUnread} />
                       </button>
                       <button
+                        type="button"
                         onClick={() => setActiveTab("groups")}
-                        className={`flex flex-1 items-center justify-center px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                        className={`flex flex-1 items-center justify-center px-2 py-3 text-sm font-medium transition-all duration-200 ${
                           activeTab === "groups"
                             ? "border-b-2 border-indigo-400 bg-gray-900/60 text-white"
                             : "text-gray-500 hover:bg-gray-900/30 hover:text-gray-300"

@@ -87,8 +87,9 @@ export default function GroupChatHeader({
           </button>
         )}
         <button
+          type="button"
           onClick={onToggleExpanded}
-          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-800/60 hover:text-white"
+          className="hidden rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-800/60 hover:text-white md:block"
           title={isExpanded ? "Collapse" : "Expand"}
         >
           {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}

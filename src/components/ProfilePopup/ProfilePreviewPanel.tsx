@@ -1,11 +1,13 @@
 import { Plus, X } from "lucide-react";
 import { UserDTO } from "../../types/userDTO";
 import ProfileFriendActions from "./ProfileFriendActions";
+import ProfileSidebarExtras from "./ProfileSidebarExtras";
 import { ErrorState, FriendStatus } from "./types";
 
 export interface ProfilePreviewPanelProps {
   user: UserDTO;
   isOwnProfile: boolean;
+  isFrozenLimited: boolean;
   loading: boolean;
   updatedFields: Set<string>;
   error: Pick<ErrorState, "photo" | "block">;
@@ -26,6 +28,7 @@ export interface ProfilePreviewPanelProps {
 export default function ProfilePreviewPanel({
   user,
   isOwnProfile,
+  isFrozenLimited,
   loading,
   updatedFields,
   error,
@@ -42,28 +45,57 @@ export default function ProfilePreviewPanel({
   onRejectRequest,
   onBlockToggle,
 }: ProfilePreviewPanelProps) {
-  return (
-    <div
-      className={`${
-        isOwnProfile ? "w-2/5" : "w-full"
-      } bg-white/5 backdrop-blur-sm flex flex-col p-6 border-l border-white/10`}
-    >
-      {!isOwnProfile && (
-        <div className="flex justify-end mb-2">
+  const handleCloseClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
+  };
+
+  if (isFrozenLimited) {
+    return (
+      <div className="relative z-20 flex h-full w-full flex-col p-3 backdrop-blur-sm sm:p-4 lg:h-full lg:w-80 lg:bg-white/5 lg:p-5">
+        <div className="relative z-30 mb-2 flex shrink-0 justify-end">
           <button
-            onClick={onClose}
-            className="text-gray-300 hover:text-white p-2 rounded-lg transition-colors duration-200"
+            type="button"
+            onClick={handleCloseClick}
+            className="relative z-30 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-gray-300 transition active:bg-white/10 active:text-white"
+            aria-label="Close profile"
           >
-            <X size={24} />
+            <X size={22} />
           </button>
         </div>
-      )}
-      <div className="flex-1 flex items-center justify-center mb-6">
-        <div className="relative w-full aspect-square max-h-full">
+
+        <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+          <p className="text-xl font-semibold text-white">@{user.nickname}</p>
+          <p className="mt-3 text-sm text-gray-500">This account is currently frozen.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const photoSize = isOwnProfile
+    ? "h-36 w-36 lg:h-40 lg:w-40"
+    : "h-28 w-28 lg:h-32 lg:w-32";
+
+  return (
+    <div className="relative z-20 flex min-h-full w-full flex-col p-3 backdrop-blur-sm sm:p-4 lg:h-full lg:min-h-0 lg:w-80 lg:overflow-y-auto lg:bg-white/5 lg:p-5 indigo-scrollbar">
+      <div className="relative z-30 mb-2 flex shrink-0 justify-end">
+        <button
+          type="button"
+          onClick={handleCloseClick}
+          className="relative z-30 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-gray-300 transition active:bg-white/10 active:text-white"
+          aria-label="Close profile"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="mb-3 flex shrink-0 justify-center">
+        <div className={`relative ${photoSize}`}>
           <img
             src={user.profileImageUrl || "https://via.placeholder.com/300"}
             alt="Profile"
-            className={`w-full h-full object-cover rounded-xl shadow-2xl transition-all duration-500 ${
+            className={`h-full w-full rounded-2xl object-cover shadow-2xl transition-all duration-500 ${
               updatedFields.has("photo")
                 ? "ring-4 ring-green-400/50 shadow-green-500/20"
                 : ""
@@ -71,12 +103,12 @@ export default function ProfilePreviewPanel({
           />
 
           {isOwnProfile && (
-            <label className="absolute inset-0 cursor-pointer rounded-xl">
-              <div className="flex h-full w-full items-center justify-center rounded-xl bg-black/0 text-white opacity-0 transition-all duration-200 hover:bg-black/45 hover:opacity-100">
+            <label className="absolute inset-0 cursor-pointer rounded-2xl">
+              <div className="flex h-full w-full items-center justify-center rounded-2xl bg-black/0 text-white opacity-0 transition-all duration-200 hover:bg-black/45 hover:opacity-100">
                 {loading ? (
-                  <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 ) : (
-                  <Plus size={44} />
+                  <Plus size={28} />
                 )}
               </div>
               <input
@@ -92,24 +124,22 @@ export default function ProfilePreviewPanel({
       </div>
 
       {error.photo && (
-        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg backdrop-blur-sm">
-          <p className="text-red-300 text-sm">{error.photo}</p>
+        <div className="mb-2 shrink-0 rounded-lg border border-red-500/30 bg-red-500/20 p-2 backdrop-blur-sm">
+          <p className="text-xs text-red-300">{error.photo}</p>
         </div>
       )}
 
       {error.block && (
-        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg backdrop-blur-sm">
-          <p className="text-red-300 text-sm">{error.block}</p>
+        <div className="mb-2 shrink-0 rounded-lg border border-red-500/30 bg-red-500/20 p-2 backdrop-blur-sm">
+          <p className="text-xs text-red-300">{error.block}</p>
         </div>
       )}
 
-      <div className="text-center">
-        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4">
+      <div className="shrink-0 text-center">
+        <h1 className="text-lg font-bold leading-tight text-white lg:text-xl">
           {user.name} {user.surname}
         </h1>
-        <p className="text-lg md:text-xl mb-4 text-gray-200 truncate">
-          @{user.nickname}
-        </p>
+        <p className="mt-0.5 truncate text-sm text-gray-400">@{user.nickname}</p>
 
         {!isOwnProfile && (
           <ProfileFriendActions
@@ -126,6 +156,8 @@ export default function ProfilePreviewPanel({
           />
         )}
       </div>
+
+      <ProfileSidebarExtras user={user} isOwnProfile={isOwnProfile} />
     </div>
   );
 }

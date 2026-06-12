@@ -2,6 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Overscroll: outside Tailwind layers so preflight cannot flatten it. */
+html {
+  height: 100%;
+  overflow: hidden;
+  background-color: #08080a;
+  overscroll-behavior: none;
+}
+
+body {
+  height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background-color: #000000;
+  overscroll-behavior-x: none;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Top rubber-band bleed */
+body::before {
+  top: 0;
+  height: 50vh;
+  transform: translateY(-100%);
+  background-color: #08080a;
+}
+
+/* Bottom rubber-band bleed */
+body::after {
+  bottom: 0;
+  height: 50vh;
+  transform: translateY(100%);
+  background-color: #000000;
+}
+
+#root {
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  background-color: #000000;
+}
+
+@layer utilities {
+  .indigo-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.55) rgba(3, 7, 18, 0.75);
+  }
+
+  .indigo-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .indigo-scrollbar::-webkit-scrollbar-track {
+    background: rgba(3, 7, 18, 0.75);
+    border-radius: 999px;
+  }
+
+  .indigo-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.55);
+    border-radius: 999px;
+  }
+
+  .indigo-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.8);
+  }
+
+  .bio-textarea {
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  @media (max-width: 1023px) {
+    .profile-popup-pager {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: y mandatory;
+      touch-action: pan-y;
+    }
+
+    .profile-popup-page {
+      flex-shrink: 0;
+      height: 100%;
+      min-height: 100%;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .profile-popup-pager {
+      overflow: hidden;
+    }
+
+    .profile-popup-page {
+      height: auto;
+      min-height: 0;
+      flex: none;
+    }
+
+    .profile-popup-page:last-child {
+      flex: 1 1 0%;
+      width: 0;
+      min-width: 0;
+    }
+  }
+}
+
 @keyframes fadeInMove {
   to {
     opacity: 1;

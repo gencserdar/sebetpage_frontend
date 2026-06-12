@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   uploadPhoto,
   requestEmailChange,
@@ -12,6 +12,7 @@ import {
   freezeAccount,
 } from "../../services/profileService";
 import { useUser } from "../../context/UserContext";
+import { useProfileNavigation } from "../../hooks/useProfileNavigation";
 import { UserDTO } from "../../types/userDTO";
 import {
   EditableField,
@@ -96,7 +97,7 @@ export function useProfileEditing({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { nickname } = useParams<{ nickname: string }>();
-  const navigate = useNavigate();
+  const { replaceProfileNickname } = useProfileNavigation();
 
   // Two-step verification state. While `verify` is set, an OTP modal is shown
   // and the underlying field-edit form is hidden behind it. The kind decides
@@ -209,7 +210,7 @@ export function useProfileEditing({
         // a follow-up navigation doesn't 404 against a name the server no
         // longer has.
         if (oldNickname !== newNickname && nickname === oldNickname) {
-          navigate(`/profile/${newNickname}`, { replace: true });
+          replaceProfileNickname(newNickname);
         }
       }
 

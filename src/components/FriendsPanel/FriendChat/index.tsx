@@ -89,41 +89,41 @@ export default function FriendChat({
 
   if (chat.isExpanded) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-black/90">
-        {expandedRail}
-        <div className="h-1/2 md:h-auto md:w-1/2 flex flex-col bg-gray-900/95 backdrop-blur-xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 pl-16 border-b border-gray-800/40 bg-gray-950/80">
-            <span className="text-lg font-bold tracking-wide text-indigo-400 select-none">
+      <div className="fixed inset-0 z-50 hidden flex-col bg-black/90 md:flex md:flex-col lg:flex-row">
+        {expandedRail ? <div className="hidden lg:block">{expandedRail}</div> : null}
+        <div className="flex h-[42vh] min-h-0 shrink-0 flex-col overflow-hidden bg-gray-900/95 backdrop-blur-xl lg:h-auto lg:min-h-0 lg:w-1/2 lg:shrink">
+          <div className="flex items-center justify-between border-b border-gray-800/40 bg-gray-950/80 px-5 py-4 lg:pl-16">
+            <span className="select-none text-lg font-bold tracking-wide text-indigo-400">
               SebetPage
             </span>
             <div className="flex items-center gap-3">
               <button
-                className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800/60"
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800/60 hover:text-white"
                 title="Search"
               >
                 <SearchIcon />
               </button>
               <button
-                className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800/60"
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800/60 hover:text-white"
                 title="Incoming requests"
               >
                 <BellIcon />
               </button>
               <button
-                className="text-gray-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800/60"
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800/60 hover:text-white"
                 title="Menu"
               >
                 <ChevronIcon />
               </button>
             </div>
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-600 select-none gap-2">
-            <Newspaper className="w-10 h-10 opacity-40" aria-hidden="true" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-gray-600 select-none">
+            <Newspaper className="h-10 w-10 opacity-40" aria-hidden="true" />
             <span className="text-sm">Posts</span>
           </div>
         </div>
 
-        <div className="h-1/2 min-h-0 md:h-auto md:w-1/2 flex flex-col bg-gray-950/98 backdrop-blur-xl p-4 border-t md:border-t-0 md:border-l border-gray-800/40 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800/40 bg-gray-950/98 p-3 backdrop-blur-xl sm:p-4 lg:h-auto lg:w-1/2 lg:border-l lg:border-t-0">
           {header}
           {removedBanner}
           {messages}
@@ -135,8 +135,8 @@ export default function FriendChat({
 
   return (
     <div
-      style={{ zIndex: 51 }}
-      className="fixed bottom-4 right-4 bg-gray-950/98 backdrop-blur-xl p-4 rounded-2xl shadow-2xl w-96 text-white border border-gray-800/40"
+      style={{ zIndex: 55 }}
+      className="fixed inset-0 flex min-h-0 flex-col bg-gray-950/98 p-3 text-white backdrop-blur-xl md:inset-auto md:bottom-4 md:right-4 md:h-auto md:min-h-0 md:w-[min(24rem,calc(100vw-2rem))] md:rounded-2xl md:border md:border-gray-800/40 md:p-4 md:shadow-2xl"
     >
       {header}
       {removedBanner}

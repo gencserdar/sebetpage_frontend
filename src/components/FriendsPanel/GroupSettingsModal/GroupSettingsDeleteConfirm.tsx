@@ -14,7 +14,7 @@ export default function GroupSettingsDeleteConfirm({
   onConfirm,
 }: GroupSettingsDeleteConfirmProps) {
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 p-4">
       <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-gray-950 p-4 text-white shadow-2xl">
         <h3 className="text-base font-semibold text-red-200">Delete group</h3>
         <p className="mt-2 text-sm text-gray-400">

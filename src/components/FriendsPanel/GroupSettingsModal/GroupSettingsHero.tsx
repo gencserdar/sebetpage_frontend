@@ -19,7 +19,7 @@ export default function GroupSettingsHero({
   onUploadPhoto,
 }: GroupSettingsHeroProps) {
   return (
-    <div className="sticky top-0 z-0 aspect-square w-full overflow-hidden border-b border-gray-800">
+    <div className="relative z-0 aspect-square w-full overflow-hidden border-b border-gray-800">
       {detail.imageUrl ? (
         <img
           src={detail.imageUrl}

@@ -17,6 +17,7 @@ import {
 export interface UseProfileSocialParams {
   profileUser: UserDTO;
   isOwnProfile: boolean;
+  enabled?: boolean;
   setError: React.Dispatch<React.SetStateAction<ErrorState>>;
 }
 
@@ -38,6 +39,7 @@ export interface UseProfileSocialReturn {
 export function useProfileSocial({
   profileUser,
   isOwnProfile,
+  enabled = true,
   setError,
 }: UseProfileSocialParams): UseProfileSocialReturn {
   const [friendStatus, setFriendStatus] = useState<FriendStatus>("none");
@@ -59,9 +61,15 @@ export function useProfileSocial({
     useState<ConfirmationModalState>(null);
 
   useEffect(() => {
+    if (!enabled || isOwnProfile || !profileUser.nickname) {
+      if (!enabled) {
+        setBlockStatusLoaded(true);
+      }
+      return;
+    }
+
     const fetchStatuses = async () => {
-      if (!isOwnProfile && profileUser.nickname) {
-        try {
+      try {
           // Fetch friend status
           const statusResponse = await getFriendStatus(profileUser.nickname);
 
@@ -102,11 +110,10 @@ export function useProfileSocial({
           console.error("Failed to fetch statuses:", err);
           setBlockStatusLoaded(true);
         }
-      }
     };
 
     fetchStatuses();
-  }, [profileUser.nickname, isOwnProfile, getBlockStatus]);
+  }, [profileUser.nickname, isOwnProfile, enabled, getBlockStatus]);
 
   const handleAddFriend = async () => {
     try {

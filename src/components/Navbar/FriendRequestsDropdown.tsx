@@ -1,26 +1,35 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { Check, Users, X } from "lucide-react";
 import { useUser } from "../../context/UserContext";
+import { useProfileNavigation } from "../../hooks/useProfileNavigation";
 import { getIncomingRequests, respondToRequest } from "../../services/friendService";
 import { FriendRequest } from "../../types/friendRequestType";
 import { useChatSocketContext } from "../../context/ChatSocketContext";
-import { Users, Check, X } from "lucide-react";
 
-type LocalFriendRequest = FriendRequest & { 
-  responseStatus?: 'accepted' | 'rejected';
+type LocalFriendRequest = FriendRequest & {
+  responseStatus?: "accepted" | "rejected";
   isProcessing?: boolean;
 };
 
-export default function FriendRequestsDropdown() {
-  const navigate = useNavigate();
+interface FriendRequestsDropdownProps {
+  inline?: boolean;
+  onNavigate?: () => void;
+  onPendingCountChange?: (count: number) => void;
+}
+
+export default function FriendRequestsDropdown({
+  inline = false,
+  onNavigate,
+  onPendingCountChange,
+}: FriendRequestsDropdownProps) {
   const location = useLocation();
-  const { nickname } = useParams<{ nickname: string }>();
+  const { openProfile } = useProfileNavigation();
   const { user } = useUser();
-  
+
   const [incomingRequests, setIncomingRequests] = useState<LocalFriendRequest[]>([]);
   const [showRequestDropdown, setShowRequestDropdown] = useState(false);
 
-  // Use WebSocket hook for real-time updates
   const { subscribeFriendEvents } = useChatSocketContext();
 
   const fetchIncomingRequests = useCallback(async () => {
@@ -33,32 +42,25 @@ export default function FriendRequestsDropdown() {
     }
   }, [user]);
 
-  // Handle dropdown toggle with refresh
   const handleDropdownToggle = () => {
     setShowRequestDropdown((prev) => {
       const newState = !prev;
-      // Refresh requests when opening the dropdown
-      if (newState) {
-        fetchIncomingRequests();
-      }
+      if (newState) void fetchIncomingRequests();
       return newState;
     });
   };
 
-  // Initial fetch and WebSocket subscription
   useEffect(() => {
-    fetchIncomingRequests();
+    void fetchIncomingRequests();
 
-    // Subscribe to real-time friend events
     const unsubscribe = subscribeFriendEvents((event: any) => {
       const eventType = event?.type;
-      
+
       switch (eventType) {
         case "FRIEND_REQUEST_RECEIVED":
           if (event.request) {
-            setIncomingRequests(prev => {
-              // Check if request already exists to avoid duplicates
-              const exists = prev.some(req => req.id === event.request.id);
+            setIncomingRequests((prev) => {
+              const exists = prev.some((req) => req.id === event.request.id);
               if (!exists) {
                 return [...prev, { ...event.request, isProcessing: false }];
               }
@@ -66,15 +68,14 @@ export default function FriendRequestsDropdown() {
             });
           }
           break;
-          
+
         case "FRIEND_REQUEST_ACCEPTED":
         case "FRIEND_REQUEST_REJECTED":
-          // Request was responded to - remove it from the list
           if (event.requestId) {
-            setIncomingRequests(prev => prev.filter(req => req.id !== event.requestId));
+            setIncomingRequests((prev) => prev.filter((req) => req.id !== event.requestId));
           }
           break;
-          
+
         case "FRIEND_REQUEST_CANCELLED":
           setIncomingRequests((currentRequests) => {
             let filtered = currentRequests;
@@ -89,25 +90,22 @@ export default function FriendRequestsDropdown() {
             } else if (event.fromUserId) {
               filtered = currentRequests.filter((req) => req.fromUser.id !== event.fromUserId);
               removedCount = currentRequests.length - filtered.length;
-            } else {
-              console.warn("CANCEL event missing identifiers:", event);
             }
 
             if (removedCount === 0) {
-              setTimeout(() => fetchIncomingRequests(), 100);
+              setTimeout(() => void fetchIncomingRequests(), 100);
             }
 
             return filtered;
           });
           break;
-          
+
         default:
-          // For any other friend-related events, refresh the list
-          if (eventType && (
-            eventType.includes("FRIEND") || 
-            eventType.includes("REQUEST")
-          )) {
-            fetchIncomingRequests();
+          if (
+            eventType &&
+            (eventType.includes("FRIEND") || eventType.includes("REQUEST"))
+          ) {
+            void fetchIncomingRequests();
           }
           break;
       }
@@ -117,151 +115,204 @@ export default function FriendRequestsDropdown() {
   }, [user, subscribeFriendEvents, fetchIncomingRequests]);
 
   useEffect(() => {
-    if (!nickname && user && location.pathname === "/") {
-      fetchIncomingRequests();
+    if (user && !location.pathname.startsWith("/profile/")) {
+      void fetchIncomingRequests();
     }
-  }, [location.pathname, nickname, user, fetchIncomingRequests]);
+  }, [location.pathname, user, fetchIncomingRequests]);
+
+  useEffect(() => {
+    if (inline) void fetchIncomingRequests();
+  }, [inline, fetchIncomingRequests]);
 
   const handleRequestResponse = async (id: number, accept: boolean) => {
-    // Immediately set the response status on frontend (optimistic update)
     setIncomingRequests((prev) =>
       prev.map((r) =>
-        r.id === id ? { 
-          ...r, 
-          responseStatus: accept ? "accepted" : "rejected",
-          isProcessing: false 
-        } : r
+        r.id === id
+          ? {
+              ...r,
+              responseStatus: accept ? "accepted" : "rejected",
+              isProcessing: false,
+            }
+          : r
       )
     );
 
     try {
-      // Make the backend call
       await respondToRequest(id, accept);
-
-      // Remove from list after showing the status for a short time
       setTimeout(() => {
         setIncomingRequests((prev) => prev.filter((r) => r.id !== id));
       }, 1500);
-
     } catch (e) {
       console.error("Failed to respond to request:", e);
-      
-      // On error, still remove the request after showing rejected status
       setTimeout(() => {
         setIncomingRequests((prev) => prev.filter((r) => r.id !== id));
       }, 1500);
     }
   };
 
-  // Handle clicking on a friend request user info to open their profile
   const handleRequestUserClick = (userNickname: string, userId: number) => {
-    setShowRequestDropdown(false); // Close the dropdown
-    // Stale-nickname guard: pass the id so the profile resolver can fall
-    // back if the requester renamed themselves between fetch and click.
-    navigate(`/profile/${userNickname}`, { state: { fallbackId: userId } });
+    setShowRequestDropdown(false);
+    openProfile(userNickname, userId);
+    onNavigate?.();
   };
 
-  // Only render if user is logged in
+  const pendingCount = incomingRequests.filter((req) => !req.responseStatus).length;
+
+  useEffect(() => {
+    onPendingCountChange?.(pendingCount);
+  }, [pendingCount, onPendingCountChange]);
+
+  const renderRequestList = () => {
+    if (incomingRequests.length === 0) {
+      return <div className="px-5 py-3 text-sm text-gray-400">No incoming requests</div>;
+    }
+
+    return (
+      <div className="space-y-1 px-3 pb-3">
+        {incomingRequests.map((req) => (
+          <div
+            key={req.id}
+            className={`flex min-h-[3.25rem] items-center justify-between gap-3 rounded-xl px-3 py-2 transition-all duration-500 ${
+              req.responseStatus === "accepted"
+                ? "border border-green-400/50 bg-green-500/20"
+                : req.responseStatus === "rejected"
+                  ? "border border-red-400/50 bg-red-500/20"
+                  : "border border-transparent active:bg-white/5"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => handleRequestUserClick(req.fromUser.nickname, req.fromUser.id)}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+            >
+              <img
+                src={req.fromUser.profileImageUrl || "/default_pp.png"}
+                alt="Profile"
+                className="h-10 w-10 shrink-0 rounded-full object-cover"
+              />
+              <span className="truncate text-base text-white">{req.fromUser.nickname}</span>
+              {req.responseStatus && (
+                <span
+                  className={`text-sm font-medium ${
+                    req.responseStatus === "accepted" ? "text-green-400" : "text-red-400"
+                  }`}
+                >
+                  {req.responseStatus === "accepted" ? "Accepted" : "Rejected"}
+                </span>
+              )}
+            </button>
+
+            {!req.responseStatus && (
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleRequestResponse(req.id, true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600 active:bg-green-500"
+                  title="Accept"
+                >
+                  <Check size={18} className="text-white" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRequestResponse(req.id, false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 active:bg-red-500"
+                  title="Reject"
+                >
+                  <X size={18} className="text-white" />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (!user) return null;
 
+  if (inline) {
+    return (
+      <section className="border-b border-white/[0.06]">
+        <div className="flex min-h-[3.25rem] items-center gap-2 px-5 pt-2 text-base font-medium text-white">
+          <Users size={18} className="text-gray-400" />
+          Friend requests
+          {pendingCount > 0 && (
+            <span className="ml-1 rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+              {pendingCount}
+            </span>
+          )}
+        </div>
+        {renderRequestList()}
+      </section>
+    );
+  }
+
   return (
-    <div className="relative ml-4">
+    <div className="relative hidden shrink-0 md:block">
       <button
+        type="button"
         onClick={handleDropdownToggle}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20"
         title="Friend Requests"
       >
         <Users size={20} />
-        {incomingRequests.length > 0 && (
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-            {incomingRequests.filter(req => !req.responseStatus).length}
+        {pendingCount > 0 && (
+          <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+            {pendingCount}
           </span>
         )}
       </button>
 
       {showRequestDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 p-3">
-          <h3 className="text-white font-semibold mb-2">Incoming Requests</h3>
+        <div className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-gray-700 bg-gray-800 p-3 shadow-lg">
+          <h3 className="mb-2 font-semibold text-white">Incoming Requests</h3>
           {incomingRequests.length === 0 ? (
             <div className="text-sm text-gray-400">No requests</div>
           ) : (
             <div className="space-y-2">
               {incomingRequests.map((req) => (
-                <div 
-                  key={req.id} 
-                  className={`
-                    flex items-center justify-between gap-3 py-2 px-3 rounded-lg transition-all duration-500 ease-in-out
-                    ${req.responseStatus === 'accepted' 
-                      ? 'bg-green-500/30 border border-green-400/50' 
-                      : req.responseStatus === 'rejected' 
-                      ? 'bg-red-500/30 border border-red-400/50' 
-                      : 'hover:bg-gray-700/50 border border-transparent'
-                    }
-                  `}
+                <div
+                  key={req.id}
+                  className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
+                    req.responseStatus === "accepted"
+                      ? "border border-green-400/50 bg-green-500/30"
+                      : req.responseStatus === "rejected"
+                        ? "border border-red-400/50 bg-red-500/30"
+                        : "border border-transparent hover:bg-gray-700/50"
+                  }`}
                 >
-                  {/* User info section - now clickable */}
                   <button
-                    onClick={() => handleRequestUserClick(req.fromUser.nickname, req.fromUser.id)}
-                    className="flex items-center gap-2 hover:opacity-80 transition-opacity text-left flex-1"
+                    type="button"
+                    onClick={() =>
+                      handleRequestUserClick(req.fromUser.nickname, req.fromUser.id)
+                    }
+                    className="flex flex-1 items-center gap-2 text-left hover:opacity-80"
                   >
                     <img
                       src={req.fromUser.profileImageUrl || "/default_pp.png"}
                       alt="Profile"
-                      className="w-8 h-8 rounded-full object-cover"
+                      className="h-8 w-8 rounded-full object-cover"
                     />
                     <span className="text-white">{req.fromUser.nickname}</span>
-                    {req.responseStatus && (
-                      <span className={`
-                        ml-2 text-sm font-medium
-                        ${req.responseStatus === 'accepted' ? 'text-green-400' : 'text-red-400'}
-                      `}>
-                        {req.responseStatus === 'accepted' ? 'Accepted' : 'Rejected'}
-                      </span>
-                    )}
                   </button>
-                  
-                  {/* Action buttons section */}
-                  <div className="flex gap-2">
-                    {/* Show action buttons only when not responded */}
-                    {!req.responseStatus && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the user click
-                            handleRequestResponse(req.id, true);
-                          }}
-                          className="p-1.5 rounded-full bg-green-600 hover:bg-green-500 hover:scale-110 transition-all duration-200"
-                          title="Accept"
-                        >
-                          <Check size={16} className="text-white" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the user click
-                            handleRequestResponse(req.id, false);
-                          }}
-                          className="p-1.5 rounded-full bg-red-600 hover:bg-red-500 hover:scale-110 transition-all duration-200"
-                          title="Reject"
-                        >
-                          <X size={16} className="text-white" />
-                        </button>
-                      </>
-                    )}
-
-                    {/* Show status icon when responded */}
-                    {req.responseStatus && (
-                      <div className={`
-                        p-1.5 rounded-full transition-all duration-300
-                        ${req.responseStatus === 'accepted' ? 'bg-green-600' : 'bg-red-600'}
-                      `}>
-                        {req.responseStatus === 'accepted' ? (
-                          <Check size={16} className="text-white" />
-                        ) : (
-                          <X size={16} className="text-white" />
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  {!req.responseStatus && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleRequestResponse(req.id, true)}
+                        className="rounded-full bg-green-600 p-1.5 hover:bg-green-500"
+                      >
+                        <Check size={16} className="text-white" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleRequestResponse(req.id, false)}
+                        className="rounded-full bg-red-600 p-1.5 hover:bg-red-500"
+                      >
+                        <X size={16} className="text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   chatApiService,
   MessagingGroupDetail,
@@ -7,9 +6,10 @@ import {
   MessagingGroupPermissions,
 } from "../../../services/chatApiService";
 import { useChatSocketContext } from "../../../context/ChatSocketContext";
+import { useProfileNavigation } from "../../../hooks/useProfileNavigation";
 import { getFriends } from "../../../services/friendService";
 import { UserDTO } from "../../../types/userDTO";
-import { emptyPermissions } from "./constants";
+import { emptyPermissions, formatGroupLoadError } from "./constants";
 import { GroupSettingsModalProps } from "./types";
 
 type UseGroupSettingsParams = Pick<
@@ -54,7 +54,7 @@ export function useGroupSettings({
   const pendingPermissionsRef = useRef<Map<number, MessagingGroupPermissions>>(new Map());
   const permissionSyncingRef = useRef<Set<number>>(new Set());
 
-  const navigate = useNavigate();
+  const { openProfile } = useProfileNavigation();
   const { subscribeFriendEvents, subscribeUserUpdates, getUserOnlineStatus } = useChatSocketContext();
 
   useEffect(() => {
@@ -100,17 +100,21 @@ export function useGroupSettings({
 
   const load = useCallback(async (resetUi = true) => {
     if (!open || !groupId) return;
-    if (resetUi) setLoading(true);
-    setError(null);
     if (resetUi) {
+      setLoading(true);
+      setDetail(null);
+      detailRef.current = null;
       setPermissionUserId(null);
       setMemberSearch("");
     }
+    setError(null);
     try {
       const next = await chatApiService.getMessagingGroup(groupId);
       applyDetail(next, { resetDrafts: resetUi });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load group");
+      setDetail(null);
+      detailRef.current = null;
+      setError(formatGroupLoadError(e));
     } finally {
       if (resetUi) setLoading(false);
     }
@@ -559,13 +563,12 @@ export function useGroupSettings({
   const openParticipantProfile = useCallback(
     (nickname: string, userId: number) => {
       if (!nickname) return;
-      navigate(`/profile/${nickname}`, { state: { fallbackId: userId } });
+      openProfile(nickname, userId);
     },
-    [navigate]
+    [openProfile]
   );
 
   const close = () => {
-    if (saving) return;
     setShowAddMembersPanel(false);
     onClose();
   };

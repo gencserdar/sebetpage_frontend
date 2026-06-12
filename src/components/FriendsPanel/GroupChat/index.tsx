@@ -77,10 +77,10 @@ export default function GroupChat(props: GroupChatProps) {
   if (chat.isExpanded) {
     return (
       <>
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/90 md:flex-row">
-          {expandedRail}
-          <div className="flex h-1/2 flex-col overflow-hidden bg-gray-900/95 backdrop-blur-xl md:h-auto md:w-1/2">
-            <div className="flex items-center justify-between border-b border-gray-800/40 bg-gray-950/80 px-5 py-4 pl-16">
+        <div className="fixed inset-0 z-50 hidden flex-col bg-black/90 md:flex md:flex-col lg:flex-row">
+          {expandedRail ? <div className="hidden lg:block">{expandedRail}</div> : null}
+          <div className="flex h-[42vh] min-h-0 shrink-0 flex-col overflow-hidden bg-gray-900/95 backdrop-blur-xl lg:h-auto lg:min-h-0 lg:w-1/2 lg:shrink">
+            <div className="flex items-center justify-between border-b border-gray-800/40 bg-gray-950/80 px-5 py-4 lg:pl-16">
               <span className="select-none text-lg font-bold tracking-wide text-indigo-400">SebetPage</span>
               <div className="flex items-center gap-3">
                 <button className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800/60 hover:text-white" title="Search">
@@ -99,7 +99,7 @@ export default function GroupChat(props: GroupChatProps) {
               <span className="text-sm">Posts</span>
             </div>
           </div>
-          <div className="flex h-1/2 min-h-0 flex-col overflow-hidden border-t border-gray-800/40 bg-gray-950/98 p-4 backdrop-blur-xl md:h-auto md:w-1/2 md:border-l md:border-t-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-800/40 bg-gray-950/98 p-3 backdrop-blur-xl sm:p-4 lg:h-auto lg:w-1/2 lg:border-l lg:border-t-0">
             {header}
             {messageList}
             {input}
@@ -113,8 +113,8 @@ export default function GroupChat(props: GroupChatProps) {
   return (
     <>
       <div
-        style={{ zIndex: 52 }}
-        className="fixed bottom-4 right-4 w-96 rounded-2xl border border-gray-800/40 bg-gray-950/98 p-4 text-white shadow-2xl backdrop-blur-xl"
+        style={{ zIndex: 55 }}
+        className="fixed inset-0 flex min-h-0 flex-col bg-gray-950/98 p-3 text-white backdrop-blur-xl md:inset-auto md:bottom-4 md:right-4 md:h-auto md:min-h-0 md:w-[min(24rem,calc(100vw-2rem))] md:rounded-2xl md:border md:border-gray-800/40 md:p-4 md:shadow-2xl"
       >
         {header}
         {messageList}
