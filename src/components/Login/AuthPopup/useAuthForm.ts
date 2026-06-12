@@ -31,7 +31,8 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
       let success = false;
 
       if (mode === "login") {
-        success = await login(email, password, rememberMe);
+        const result = await login(email, password, rememberMe);
+        success = result.ok;
       } else if (mode === "forgot") {
         success = await forgotPassword(email);
         if (success) {

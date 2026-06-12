@@ -1,5 +1,6 @@
 import { useUser } from "../../context/UserContext";
 import ProfileConfirmationModal from "./ProfileConfirmationModal";
+import FreezeAccountConfirmModal from "../FreezeAccountConfirmModal";
 import ProfilePreviewPanel from "./ProfilePreviewPanel";
 import ProfileSettingsPanel from "./ProfileSettingsPanel";
 import ProfileVerifyModal from "./ProfileVerifyModal";
@@ -45,6 +46,8 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
             onConfirmPasswordChange={editing.setConfirmPassword}
             onPasswordSubmit={editing.handlePasswordSubmit}
             onPasswordCancel={() => editing.cancelEditing("password")}
+            onFreezeAccount={editing.handleFreezeAccount}
+            freezeLoading={editing.freezeLoading}
           />
         )}
 
@@ -68,6 +71,14 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           onBlockToggle={social.showBlockConfirmation}
         />
       </div>
+
+      {editing.freezeConfirmOpen && (
+        <FreezeAccountConfirmModal
+          loading={editing.freezeLoading}
+          onClose={editing.closeFreezeConfirm}
+          onConfirm={editing.confirmFreezeAccount}
+        />
+      )}
 
       {social.confirmationModal?.isOpen && (
         <ProfileConfirmationModal

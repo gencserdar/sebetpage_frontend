@@ -9,6 +9,7 @@ import {
   requestPasswordChange,
   confirmPasswordChange,
   FieldUpdateResponse,
+  freezeAccount,
 } from "../../services/profileService";
 import { useUser } from "../../context/UserContext";
 import { UserDTO } from "../../types/userDTO";
@@ -54,16 +55,23 @@ export interface UseProfileEditingReturn {
   handleClose: () => void;
   getFieldValue: (field: UserEditableField) => string;
   triggerHighlight: (field: string) => void;
+  handleFreezeAccount: () => void;
+  confirmFreezeAccount: () => Promise<void>;
+  freezeConfirmOpen: boolean;
+  closeFreezeConfirm: () => void;
+  freezeLoading: boolean;
 }
 
 export function useProfileEditing({
   user,
   onClose,
 }: UseProfileEditingParams): UseProfileEditingReturn {
-  const { setUser } = useUser();
+  const { setUser, logout } = useUser();
   const [editField, setEditField] = useState<EditableField | null>(null);
   const [error, setError] = useState<ErrorState>({});
   const [loading, setLoading] = useState(false);
+  const [freezeLoading, setFreezeLoading] = useState(false);
+  const [freezeConfirmOpen, setFreezeConfirmOpen] = useState(false);
   const [updatedFields, setUpdatedFields] = useState<Set<string>>(new Set());
   const [localUser, setLocalUser] = useState<UserDTO>(user);
 
@@ -338,6 +346,32 @@ export function useProfileEditing({
     return localUser[field] || "";
   };
 
+  const handleFreezeAccount = () => {
+    setError({});
+    setFreezeConfirmOpen(true);
+  };
+
+  const closeFreezeConfirm = () => {
+    if (!freezeLoading) setFreezeConfirmOpen(false);
+  };
+
+  const confirmFreezeAccount = async () => {
+    setFreezeLoading(true);
+    setError({});
+    try {
+      await freezeAccount();
+      setFreezeConfirmOpen(false);
+      onClose();
+      await logout();
+    } catch (err) {
+      setError({
+        general: err instanceof Error ? err.message : "Could not freeze account",
+      });
+    } finally {
+      setFreezeLoading(false);
+    }
+  };
+
   return {
     editField,
     error,
@@ -368,5 +402,10 @@ export function useProfileEditing({
     handleClose,
     getFieldValue,
     triggerHighlight,
+    handleFreezeAccount,
+    confirmFreezeAccount,
+    freezeConfirmOpen,
+    closeFreezeConfirm,
+    freezeLoading,
   };
 }

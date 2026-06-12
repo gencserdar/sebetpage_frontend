@@ -10,12 +10,13 @@ import {
 } from "../services/authService";
 import { UserDTO } from "../types/userDTO";
 import { tearDownChatSocket } from "../hooks/useWebSocket";
+import FrozenAccountModal from "../components/FrozenAccountModal";
 
 interface UserContextType {
   user: UserDTO | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string, rememberMe: boolean) => Promise<boolean>;
+  login: (email: string, password: string, rememberMe: boolean) => Promise<{ ok: boolean; frozen: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   forgotPassword: (email: string) => Promise<boolean>;
@@ -26,7 +27,7 @@ const UserContext = createContext<UserContextType>({
   user: null,
   loading: true,
   isAuthenticated: false,
-  login: async () => false,
+  login: async () => ({ ok: false, frozen: false }),
   logout: async () => {},
   refreshUser: async () => {},
   forgotPassword: async () => false,
@@ -78,11 +79,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string, rememberMe: boolean) => {
-    const success = await loginService(email, password, rememberMe);
-    if (success) {
+    const result = await loginService(email, password, rememberMe);
+    if (result.ok) {
       await refreshUser();
     }
-    return success;
+    return result;
   };
 
   const forgotPassword = async (email: string) => forgotPasswordService(email);
@@ -115,6 +116,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }}
     >
       {children}
+      <FrozenAccountModal />
     </UserContext.Provider>
   );
 };

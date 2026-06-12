@@ -75,3 +75,13 @@ export const confirmPasswordChange = async (code: string): Promise<void> => {
   });
   if (!res.ok) throw new Error(await res.text());
 };
+
+export const freezeAccount = async (): Promise<void> => {
+  const res = await api("/api/user/freeze", { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+};
+
+export const unfreezeAccount = async (): Promise<void> => {
+  const res = await api("/api/user/unfreeze", { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+};

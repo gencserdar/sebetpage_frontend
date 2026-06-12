@@ -14,7 +14,7 @@ interface ChatSocketProviderProps {
 
 export function ChatSocketProvider({ children }: ChatSocketProviderProps) {
   const { user } = useUser();
-  const chatSocket = useChatSocket(user?.email || "");
+  const chatSocket = useChatSocket(user && !user.frozen ? user.email : "");
 
   return (
     <ChatSocketContext.Provider value={chatSocket}>

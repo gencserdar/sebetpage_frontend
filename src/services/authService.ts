@@ -88,7 +88,11 @@ function parseApiError(text: string): string {
   return text;
 }
 
-export async function login(email: string, password: string, rememberMe: boolean): Promise<boolean> {
+export async function login(
+  email: string,
+  password: string,
+  rememberMe: boolean
+): Promise<{ ok: boolean; frozen: boolean }> {
   try {
     const res = await api("/api/auth/login", {
       method: "POST",
@@ -110,8 +114,8 @@ export async function login(email: string, password: string, rememberMe: boolean
     if (!token) throw new Error("No token returned");
 
     setAccessToken(token);
-    
-    return true;
+
+    return { ok: true, frozen: !!data.frozen };
   } catch (err) {
     console.error("Login error:", err);
     throw err;

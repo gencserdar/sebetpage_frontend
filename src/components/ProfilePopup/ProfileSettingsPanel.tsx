@@ -26,6 +26,8 @@ export interface ProfileSettingsPanelProps {
   onConfirmPasswordChange: (value: string) => void;
   onPasswordSubmit: () => void;
   onPasswordCancel: () => void;
+  onFreezeAccount: () => void;
+  freezeLoading?: boolean;
 }
 
 export default function ProfileSettingsPanel({
@@ -47,6 +49,8 @@ export default function ProfileSettingsPanel({
   onConfirmPasswordChange,
   onPasswordSubmit,
   onPasswordCancel,
+  onFreezeAccount,
+  freezeLoading = false,
 }: ProfileSettingsPanelProps) {
   const fieldProps = {
     canEdit: true,
@@ -153,6 +157,19 @@ export default function ProfileSettingsPanel({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {editField !== "password" && (
+          <div className="mt-10 pt-8 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onFreezeAccount}
+              disabled={freezeLoading || loading}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
+            >
+              {freezeLoading ? "Freezing..." : "Freeze account"}
+            </button>
           </div>
         )}
       </div>

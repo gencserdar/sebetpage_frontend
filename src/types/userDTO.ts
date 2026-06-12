@@ -9,5 +9,6 @@ export interface UserDTO {
   location?: string;
   website?: string;
   activated: boolean;
+  frozen?: boolean;
   role: string;
 }
