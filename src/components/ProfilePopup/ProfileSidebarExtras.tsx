@@ -8,11 +8,15 @@ import { UserDTO } from "../../types/userDTO";
 interface ProfileSidebarExtrasProps {
   user: UserDTO;
   isOwnProfile: boolean;
+  variant?: "embedded" | "standalone";
+  className?: string;
 }
 
 export default function ProfileSidebarExtras({
   user,
   isOwnProfile,
+  variant = "embedded",
+  className = "",
 }: ProfileSidebarExtrasProps) {
   const { bio, socialLinks, loading } = useProfileSettings(user.id);
   const [bioModalOpen, setBioModalOpen] = useState(false);
@@ -23,9 +27,14 @@ export default function ProfileSidebarExtras({
   const hasLinks = socialLinks.length > 0;
   const hasContent = hasBio || hasLinks;
 
+  const isStandalone = variant === "standalone";
+  const wrapperClass = isStandalone
+    ? "flex w-full min-w-0 flex-col"
+    : "mt-5 min-w-0 w-full border-t border-white/10 pt-5";
+
   return (
     <>
-      <div className="mt-5 min-w-0 w-full border-t border-white/10 pt-5">
+      <div className={`${wrapperClass} ${className}`}>
         {loading ? (
           <p className="text-center text-xs text-gray-500">Loading…</p>
         ) : hasContent ? (
@@ -54,11 +63,13 @@ export default function ProfileSidebarExtras({
             )}
 
             {hasLinks && (
-              <div>
+              <div className="min-w-0">
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600">
                   Links
                 </p>
-                <ProfileSocialLinksDisplay links={socialLinks} />
+                <div className="min-w-0 overflow-x-hidden">
+                  <ProfileSocialLinksDisplay links={socialLinks} />
+                </div>
               </div>
             )}
           </div>

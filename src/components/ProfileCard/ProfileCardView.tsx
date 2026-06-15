@@ -8,6 +8,7 @@ interface ProfileCardViewProps {
   isOwnProfile: boolean;
   isFrozenLimited?: boolean;
   nickname: string;
+  variant?: "popup" | "page";
 }
 
 export default function ProfileCardView({
@@ -15,6 +16,7 @@ export default function ProfileCardView({
   isOwnProfile,
   isFrozenLimited = false,
   nickname,
+  variant = "page",
 }: ProfileCardViewProps) {
   const navigate = useNavigate();
   const { widgets, isEmpty, loading } = useProfileSettings(userId, {
@@ -74,24 +76,57 @@ export default function ProfileCardView({
     );
   }
 
+  const isPopup = variant === "popup";
+
+  const canvasLabelClass =
+    "items-center gap-1.5 rounded-md border border-white/10 bg-black/50 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.55)] backdrop-blur-sm transition duration-200";
+
+  const canvasLabelContent = (
+    <>
+      <LayoutGrid size={14} className="text-gray-400 transition-colors duration-200 group-hover:text-gray-200" />
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 transition-colors duration-200 group-hover:text-white">
+        CANVAS
+      </span>
+    </>
+  );
+
   return (
-    <div className="flex h-full min-h-0 w-full flex-col p-3 sm:p-6 lg:h-full lg:p-6">
-      <div className="mb-2 flex shrink-0 items-center gap-2 text-gray-500 sm:mb-3">
-        <LayoutGrid size={16} />
-        <span className="text-xs font-medium uppercase tracking-widest">CANVAS</span>
-      </div>
-      <div className="relative min-h-0 w-full flex-1 overflow-hidden lg:h-full">
-        <ProfileCardGrid widgets={widgets} mode="view" fill />
-      </div>
-      {isOwnProfile && (
-        <button
-          type="button"
-          onClick={goToProfileSettings}
-          className="mt-2 shrink-0 self-center text-sm text-indigo-300 transition hover:text-indigo-200 sm:mt-4"
-        >
-          Edit in profile settings
-        </button>
+    <div
+      className={`relative flex h-full min-h-0 w-full flex-col overflow-hidden ${
+        isPopup ? "profile-canvas-view--popup p-2" : "p-2 pb-1 sm:p-6 md:p-6"
+      }`}
+    >
+      {!isPopup && (
+        <div className="mb-1 flex shrink-0 items-center gap-2 text-gray-500 sm:mb-3">
+          <LayoutGrid size={16} />
+          <span className="text-xs font-medium uppercase tracking-widest">CANVAS</span>
+        </div>
       )}
+
+      <div className="profile-canvas-area relative flex min-h-0 flex-1 overflow-hidden">
+        <div className="profile-canvas-shell relative h-full min-h-0 w-full min-w-0">
+          {isPopup && isOwnProfile && (
+            <button
+              type="button"
+              onClick={goToProfileSettings}
+              aria-label="Edit canvas in profile settings"
+              className={`group absolute left-0 top-0 z-10 hidden md:inline-flex ${canvasLabelClass} hover:border-indigo-300/35 hover:bg-black/70 hover:shadow-[0_4px_20px_rgba(0,0,0,0.7)] active:scale-[0.98]`}
+            >
+              {canvasLabelContent}
+            </button>
+          )}
+
+          {isPopup && !isOwnProfile && (
+            <div
+              className={`pointer-events-none absolute left-0 top-0 z-10 hidden md:inline-flex ${canvasLabelClass}`}
+            >
+              {canvasLabelContent}
+            </div>
+          )}
+
+          <ProfileCardGrid widgets={widgets} mode="view" fill className="h-full w-full" />
+        </div>
+      </div>
     </div>
   );
 }

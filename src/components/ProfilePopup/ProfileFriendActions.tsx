@@ -12,6 +12,7 @@ export interface ProfileFriendActionsProps {
   onAcceptRequest: () => void;
   onRejectRequest: () => void;
   onBlockToggle: () => void;
+  layout?: "default" | "mobileCard";
 }
 
 const btn =
@@ -28,7 +29,11 @@ export default function ProfileFriendActions({
   onAcceptRequest,
   onRejectRequest,
   onBlockToggle,
+  layout = "default",
 }: ProfileFriendActionsProps) {
+  const isMobileCard = layout === "mobileCard";
+  const rowClass = isMobileCard ? "flex w-full gap-2.5" : "flex flex-wrap justify-center gap-2";
+  const btnSize = isMobileCard ? "flex-1 py-3 text-sm" : "";
   if (!blockStatusLoaded) {
     return (
       <div className="mt-3 flex justify-center">
@@ -38,14 +43,14 @@ export default function ProfileFriendActions({
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className={`space-y-2 ${isMobileCard ? "mt-4 w-full" : "mt-3"}`}>
       {!isBlocked && friendStatus !== "none" && (
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className={rowClass}>
           {friendStatus === "sent" && (
             <button
               type="button"
               onClick={onCancelRequest}
-              className={`${btn} border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-200 hover:bg-red-500/20`}
+              className={`${btn} ${btnSize} border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-200 hover:bg-red-500/20`}
             >
               <X size={14} />
               Cancel
@@ -56,7 +61,7 @@ export default function ProfileFriendActions({
             <button
               type="button"
               onClick={onRemoveFriend}
-              className={`${btn} border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-200 hover:bg-red-500/20`}
+              className={`${btn} ${btnSize} border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-200 hover:bg-red-500/20`}
             >
               <UserMinus size={14} />
               Remove
@@ -68,7 +73,7 @@ export default function ProfileFriendActions({
               <button
                 type="button"
                 onClick={onAcceptRequest}
-                className={`${btn} bg-green-600/80 px-3 py-1.5 text-white hover:bg-green-600`}
+                className={`${btn} ${btnSize} bg-green-600/80 px-3 py-1.5 text-white hover:bg-green-600`}
               >
                 <Check size={14} />
                 Accept
@@ -76,7 +81,7 @@ export default function ProfileFriendActions({
               <button
                 type="button"
                 onClick={onRejectRequest}
-                className={`${btn} border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-200 hover:bg-red-500/20`}
+                className={`${btn} ${btnSize} border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-red-200 hover:bg-red-500/20`}
               >
                 <X size={14} />
                 Decline
@@ -86,12 +91,12 @@ export default function ProfileFriendActions({
         </div>
       )}
 
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className={rowClass}>
         {!isBlocked && friendStatus === "none" && (
           <button
             type="button"
             onClick={onAddFriend}
-            className={`${btn} bg-indigo-500/80 px-4 py-1.5 text-white hover:bg-indigo-500`}
+            className={`${btn} ${btnSize} bg-indigo-500/80 px-4 py-1.5 text-white hover:bg-indigo-500`}
           >
             <UserPlus size={14} />
             Add friend
@@ -102,7 +107,7 @@ export default function ProfileFriendActions({
           type="button"
           onClick={onBlockToggle}
           disabled={blockLoading}
-          className={`${btn} px-3 py-1.5 ${
+          className={`${btn} ${btnSize} px-3 py-1.5 ${
             isBlocked
               ? "border border-white/15 bg-white/10 text-gray-200 hover:bg-white/15"
               : "border border-orange-500/25 text-orange-300/90 hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-200"

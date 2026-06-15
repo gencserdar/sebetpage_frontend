@@ -60,8 +60,12 @@ function widgetStyle(widget: ProfileWidget, metrics: GridMetrics) {
   };
 }
 
-function measureContainer(el: HTMLElement): GridMetrics {
-  return fitGridToContainer(el);
+function measureContainer(el: HTMLElement, mode: "view" | "edit"): GridMetrics {
+  return fitGridToContainer(el, { uniformCells: shouldUseUniformCells(mode) });
+}
+
+function shouldUseUniformCells(mode: "view" | "edit") {
+  return mode === "view";
 }
 
 export default function ProfileCardGrid({
@@ -85,13 +89,18 @@ export default function ProfileCardGrid({
     const shell = el.parentElement;
     if (!shell) return;
 
-    const update = () => setMetrics(measureContainer(shell));
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => setMetrics(measureContainer(shell, mode));
     update();
 
     const observer = new ResizeObserver(update);
     observer.observe(shell);
-    return () => observer.disconnect();
-  }, [fill]);
+    media.addEventListener("change", update);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", update);
+    };
+  }, [fill, mode]);
 
   const emptyCells = useMemo(() => {
     if (mode !== "edit") return [];
@@ -165,13 +174,13 @@ export default function ProfileCardGrid({
     window.addEventListener("mouseup", onUp);
   };
 
-  const { cellW, cellH, gap, width, height } = metrics;
+  const { cellW, cellH, gap } = metrics;
 
   return (
     <div
       ref={containerRef}
       className={`relative ${fill ? "h-full w-full" : "mx-auto shrink-0"} ${className}`}
-      style={fill ? undefined : { width, height }}
+      style={fill ? undefined : { width: metrics.width, height: metrics.height }}
     >
       {mode === "edit" &&
         Array.from({ length: GRID_ROWS * GRID_COLS }).map((_, index) => {

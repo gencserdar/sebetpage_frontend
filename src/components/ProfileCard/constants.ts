@@ -89,7 +89,16 @@ export function fixedGridSize() {
   };
 }
 
-export function fitGridToContainer(container: HTMLElement) {
+/** Natural width:height of the 4×6 square-cell grid (matches settings editor). */
+export function canvasGridAspectRatio() {
+  const { width, height } = fixedGridSize();
+  return { width, height };
+}
+
+export function fitGridToContainer(
+  container: HTMLElement,
+  options: { uniformCells?: boolean } = {}
+) {
   const gap = GRID_GAP_PX;
   const maxW = container.clientWidth;
   const maxH = container.clientHeight;
@@ -98,10 +107,22 @@ export function fitGridToContainer(container: HTMLElement) {
     return fixedGridSize();
   }
 
-  const cellW = Math.max(0, (maxW - (GRID_COLS - 1) * gap) / GRID_COLS);
-  const cellH = Math.max(0, (maxH - (GRID_ROWS - 1) * gap) / GRID_ROWS);
-  const width = GRID_COLS * cellW + (GRID_COLS - 1) * gap;
-  const height = GRID_ROWS * cellH + (GRID_ROWS - 1) * gap;
+  const cellFromWidth = Math.max(0, (maxW - (GRID_COLS - 1) * gap) / GRID_COLS);
+  const cellFromHeight = Math.max(0, (maxH - (GRID_ROWS - 1) * gap) / GRID_ROWS);
 
-  return { cellW, cellH, gap, width, height };
+  if (options.uniformCells) {
+    const cell = Math.min(cellFromWidth, cellFromHeight);
+    return {
+      cellW: cell,
+      cellH: cell,
+      gap,
+      width: GRID_COLS * cell + (GRID_COLS - 1) * gap,
+      height: GRID_ROWS * cell + (GRID_ROWS - 1) * gap,
+    };
+  }
+
+  const width = GRID_COLS * cellFromWidth + (GRID_COLS - 1) * gap;
+  const height = GRID_ROWS * cellFromHeight + (GRID_ROWS - 1) * gap;
+
+  return { cellW: cellFromWidth, cellH: cellFromHeight, gap, width, height };
 }

@@ -23,6 +23,8 @@ export interface ProfilePreviewPanelProps {
   onAcceptRequest: () => void;
   onRejectRequest: () => void;
   onBlockToggle: () => void;
+  /** Mobile pager: bio/links live on the next snap page; still shown inline on lg. */
+  hideSidebarExtras?: boolean;
 }
 
 export default function ProfilePreviewPanel({
@@ -44,6 +46,7 @@ export default function ProfilePreviewPanel({
   onAcceptRequest,
   onRejectRequest,
   onBlockToggle,
+  hideSidebarExtras = false,
 }: ProfilePreviewPanelProps) {
   const handleCloseClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -53,7 +56,7 @@ export default function ProfilePreviewPanel({
 
   if (isFrozenLimited) {
     return (
-      <div className="relative z-20 flex h-full w-full flex-col p-3 backdrop-blur-sm sm:p-4 lg:h-full lg:w-80 lg:bg-white/5 lg:p-5">
+      <div className="relative z-20 flex h-full w-full flex-col p-4 sm:p-5 lg:h-full lg:w-80 lg:bg-white/5 lg:p-5">
         <div className="relative z-30 mb-2 flex shrink-0 justify-end">
           <button
             type="button"
@@ -73,13 +76,16 @@ export default function ProfilePreviewPanel({
     );
   }
 
-  const photoSize = isOwnProfile
-    ? "h-36 w-36 lg:h-40 lg:w-40"
-    : "h-28 w-28 lg:h-32 lg:w-32";
+  const photoMobileSize = isOwnProfile
+    ? "max-md:h-[292px] max-md:w-[292px]"
+    : "max-md:h-[226px] max-md:w-[226px]";
+  const photoTabletSize = isOwnProfile
+    ? "md:h-32 md:w-32 lg:h-40 lg:w-40 md:aspect-auto"
+    : "md:h-28 md:w-28 lg:h-32 lg:w-32 md:aspect-auto";
 
   return (
-    <div className="relative z-20 flex min-h-full w-full flex-col p-3 backdrop-blur-sm sm:p-4 lg:h-full lg:min-h-0 lg:w-80 lg:overflow-y-auto lg:bg-white/5 lg:p-5 indigo-scrollbar">
-      <div className="relative z-30 mb-2 flex shrink-0 justify-end">
+    <div className="relative z-20 flex w-full min-w-0 flex-col overflow-x-hidden p-3 sm:p-4 md:h-full md:min-h-0 md:w-72 md:overflow-y-auto md:bg-white/5 md:p-5 lg:w-80 indigo-scrollbar">
+      <div className="relative z-30 mb-1 flex shrink-0 justify-end md:mb-2">
         <button
           type="button"
           onClick={handleCloseClick}
@@ -91,7 +97,7 @@ export default function ProfilePreviewPanel({
       </div>
 
       <div className="mb-3 flex shrink-0 justify-center">
-        <div className={`relative ${photoSize}`}>
+        <div className={`relative aspect-square ${photoMobileSize} ${photoTabletSize}`}>
           <img
             src={user.profileImageUrl || "https://via.placeholder.com/300"}
             alt="Profile"
@@ -139,7 +145,7 @@ export default function ProfilePreviewPanel({
         <h1 className="text-lg font-bold leading-tight text-white lg:text-xl">
           {user.name} {user.surname}
         </h1>
-        <p className="mt-0.5 truncate text-sm text-gray-400">@{user.nickname}</p>
+        <p className="mt-1 truncate text-sm text-gray-400">@{user.nickname}</p>
 
         {!isOwnProfile && (
           <ProfileFriendActions
@@ -153,11 +159,16 @@ export default function ProfilePreviewPanel({
             onAcceptRequest={onAcceptRequest}
             onRejectRequest={onRejectRequest}
             onBlockToggle={onBlockToggle}
+            layout="mobileCard"
           />
         )}
       </div>
 
-      <ProfileSidebarExtras user={user} isOwnProfile={isOwnProfile} />
+      <ProfileSidebarExtras
+        user={user}
+        isOwnProfile={isOwnProfile}
+        className={hideSidebarExtras ? "hidden md:block" : undefined}
+      />
     </div>
   );
 }

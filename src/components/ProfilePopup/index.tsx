@@ -1,20 +1,32 @@
 import { createPortal } from "react-dom";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useUser } from "../../context/UserContext";
 import ProfileConfirmationModal from "./ProfileConfirmationModal";
 import ProfilePreviewPanel from "./ProfilePreviewPanel";
+import ProfileSidebarExtras from "./ProfileSidebarExtras";
 import ProfileCardView from "../ProfileCard/ProfileCardView";
 import { ProfilePopupProps } from "./types";
 import { useProfileEditing } from "./useProfileEditing";
 import { useProfileSocial } from "./useProfileSocial";
+
+const SWIPE_THRESHOLD_PX = 48;
 
 export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   const { user: currentUser } = useUser();
   const editing = useProfileEditing({ user, onClose });
   const isOwnProfile = currentUser?.id === editing.localUser.id;
   const isFrozenLimited = !isOwnProfile && !!editing.localUser.frozen;
-  const canvasPageRef = useRef<HTMLDivElement>(null);
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef(0);
+  const mobilePageRef = useRef(0);
+
+  const [mobilePage, setMobilePage] = useState(0);
+  const [pagerHeight, setPagerHeight] = useState(0);
+  const [isMobilePager, setIsMobilePager] = useState(false);
+
+  const pageCount = isFrozenLimited ? 1 : 3;
+  mobilePageRef.current = mobilePage;
 
   const social = useProfileSocial({
     profileUser: editing.localUser,
@@ -34,69 +46,178 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
     };
   }, []);
 
-  const scrollToCanvas = () => {
-    canvasPageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncMode = () => setIsMobilePager(media.matches);
+    syncMode();
+    media.addEventListener("change", syncMode);
+    return () => media.removeEventListener("change", syncMode);
+  }, []);
+
+  useEffect(() => {
+    const pager = pagerRef.current;
+    if (!pager) return;
+
+    const updateHeight = () => {
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        setPagerHeight(pager.clientHeight);
+      }
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(pager);
+    window.addEventListener("resize", updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, []);
+
+  const goToPage = useCallback(
+    (index: number) => {
+      setMobilePage(Math.max(0, Math.min(pageCount - 1, index)));
+    },
+    [pageCount]
+  );
+
+  const handleTouchStart = (event: React.TouchEvent) => {
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+    touchStartY.current = event.touches[0].clientY;
   };
 
+  const handleTouchEnd = (event: React.TouchEvent) => {
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+
+    const deltaY = event.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(deltaY) < SWIPE_THRESHOLD_PX) return;
+
+    const current = mobilePageRef.current;
+    if (deltaY < 0) goToPage(current + 1);
+    else goToPage(current - 1);
+  };
+
+  const mobilePageStyle =
+    isMobilePager && pagerHeight > 0
+      ? { height: pagerHeight, minHeight: pagerHeight }
+      : undefined;
+
+  const sliderStyle =
+    isMobilePager && pagerHeight > 0
+      ? { transform: `translateY(-${mobilePage * pagerHeight}px)` }
+      : undefined;
+
   return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-5 backdrop-blur-sm sm:p-6 lg:p-4"
-      onClick={editing.handleClose}
-    >
+    <>
       <div
-        className="relative flex h-[calc(100dvh-3.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/15 bg-[#101018]/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:h-[min(740px,calc(100dvh-4rem))] lg:h-[min(740px,92vh)] lg:rounded-2xl"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 px-5 pb-8 pt-7 backdrop-blur-sm sm:px-6 sm:pb-9 sm:pt-8 lg:p-6"
+        onClick={editing.handleClose}
+      >
+      <div
+        className="relative flex h-[min(33rem,calc(100dvh-5rem))] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/15 bg-[#101018] shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:h-[min(36rem,calc(100dvh-4.75rem))] md:h-[min(820px,94vh,calc((100vw-3rem-18rem)*1.5))] md:w-fit md:max-w-[calc(100vw-1.5rem)] md:-translate-y-3 md:rounded-2xl md:bg-[#101018]/95 md:backdrop-blur-xl lg:max-h-[min(820px,94vh)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="profile-popup-pager flex min-h-0 min-w-0 flex-1 flex-col lg:h-full lg:w-full lg:flex-row lg:items-stretch lg:overflow-hidden">
-          <div className="profile-popup-page flex h-full w-full shrink-0 flex-col bg-white/5 lg:h-auto lg:w-80 lg:flex-none lg:overflow-hidden lg:bg-transparent">
-            <div className="flex min-h-0 flex-1 flex-col touch-pan-y lg:h-full lg:overflow-y-auto lg:indigo-scrollbar">
-              <ProfilePreviewPanel
-                user={editing.localUser}
-                isOwnProfile={isOwnProfile}
-                isFrozenLimited={isFrozenLimited}
-                loading={editing.loading}
-                updatedFields={editing.updatedFields}
-                error={editing.error}
-                friendStatus={social.friendStatus}
-                isBlocked={social.isBlocked}
-                blockStatusLoaded={social.blockStatusLoaded}
-                blockLoading={social.blockLoading}
-                onClose={editing.handleClose}
-                onPhotoUpload={editing.handlePhotoUpload}
-                onAddFriend={social.handleAddFriend}
-                onCancelRequest={social.showCancelRequestConfirmation}
-                onRemoveFriend={social.showRemoveFriendConfirmation}
-                onAcceptRequest={social.handleAcceptRequest}
-                onRejectRequest={social.handleRejectRequest}
-                onBlockToggle={social.showBlockConfirmation}
-              />
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-white/[0.04] via-transparent to-white/[0.02] max-md:from-white/[0.03] md:hidden"
+          aria-hidden
+        />
+        <div
+          ref={pagerRef}
+          className="profile-popup-pager relative z-10 min-h-0 min-w-0 flex-1 overflow-hidden md:flex md:h-full md:w-fit md:flex-row md:items-stretch"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div
+            className="max-md:flex max-md:flex-col max-md:transition-transform max-md:duration-300 max-md:ease-out md:contents"
+            style={sliderStyle}
+          >
+            <div
+              className="profile-popup-page flex w-full shrink-0 flex-col md:h-auto md:w-72 md:flex-none md:overflow-hidden lg:w-80"
+              style={mobilePageStyle}
+            >
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:overflow-y-auto md:overscroll-y-contain indigo-scrollbar">
+                <ProfilePreviewPanel
+                  user={editing.localUser}
+                  isOwnProfile={isOwnProfile}
+                  isFrozenLimited={isFrozenLimited}
+                  loading={editing.loading}
+                  updatedFields={editing.updatedFields}
+                  error={editing.error}
+                  friendStatus={social.friendStatus}
+                  isBlocked={social.isBlocked}
+                  blockStatusLoaded={social.blockStatusLoaded}
+                  blockLoading={social.blockLoading}
+                  onClose={editing.handleClose}
+                  onPhotoUpload={editing.handlePhotoUpload}
+                  onAddFriend={social.handleAddFriend}
+                  onCancelRequest={social.showCancelRequestConfirmation}
+                  onRemoveFriend={social.showRemoveFriendConfirmation}
+                  onAcceptRequest={social.handleAcceptRequest}
+                  onRejectRequest={social.handleRejectRequest}
+                  onBlockToggle={social.showBlockConfirmation}
+                  hideSidebarExtras
+                />
+              </div>
+
+              {!isFrozenLimited && (
+                <button
+                  type="button"
+                  onClick={() => goToPage(1)}
+                  className="flex shrink-0 touch-manipulation flex-col items-center gap-0.5 border-t border-white/10 py-3 text-gray-500 transition active:text-gray-300 md:hidden"
+                  aria-label="Go to details"
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-widest">
+                    Details
+                  </span>
+                  <ChevronDown size={18} aria-hidden />
+                </button>
+              )}
             </div>
 
-            {!isFrozenLimited && (
-              <button
-                type="button"
-                onClick={scrollToCanvas}
-                className="flex shrink-0 touch-manipulation flex-col items-center gap-0.5 border-t border-white/10 py-3 text-gray-500 transition active:text-gray-300 lg:hidden"
-                aria-label="Go to canvas"
-              >
-                <span className="text-[10px] font-semibold uppercase tracking-widest">Canvas</span>
-                <ChevronDown size={18} aria-hidden />
-              </button>
-            )}
-          </div>
+            <div
+              className="profile-popup-page flex w-full shrink-0 flex-col md:hidden"
+              style={mobilePageStyle}
+            >
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-5">
+                <div className="my-auto w-full min-w-0">
+                  <ProfileSidebarExtras
+                    user={editing.localUser}
+                    isOwnProfile={isOwnProfile}
+                    variant="standalone"
+                  />
+                </div>
+              </div>
 
-          <div
-            ref={canvasPageRef}
-            className="profile-popup-page flex h-full w-full min-h-0 flex-col bg-white/5 lg:w-0 lg:flex-1 lg:overflow-hidden lg:border-l lg:border-white/10 lg:bg-black/20"
-          >
-            <ProfileCardView
-              userId={editing.localUser.id}
-              isOwnProfile={isOwnProfile}
-              isFrozenLimited={isFrozenLimited}
-              nickname={editing.localUser.nickname}
-            />
+              {!isFrozenLimited && (
+                <button
+                  type="button"
+                  onClick={() => goToPage(2)}
+                  className="flex shrink-0 touch-manipulation flex-col items-center gap-0.5 border-t border-white/10 py-3 text-gray-500 transition active:text-gray-300"
+                  aria-label="Go to canvas"
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-widest">
+                    Canvas
+                  </span>
+                  <ChevronDown size={18} aria-hidden />
+                </button>
+              )}
+            </div>
+
+            <div
+              className="profile-popup-page profile-popup-page--canvas flex w-full min-h-0 shrink-0 flex-col md:overflow-hidden md:border-l md:border-white/10 md:bg-black/20"
+              style={mobilePageStyle}
+            >
+              <ProfileCardView
+                userId={editing.localUser.id}
+                isOwnProfile={isOwnProfile}
+                isFrozenLimited={isFrozenLimited}
+                nickname={editing.localUser.nickname}
+                variant="popup"
+              />
+            </div>
           </div>
         </div>
+      </div>
       </div>
 
       {social.confirmationModal?.isOpen && (
@@ -105,7 +226,7 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
           onClose={social.closeConfirmationModal}
         />
       )}
-    </div>,
+    </>,
     document.body
   );
 }
