@@ -264,7 +264,7 @@ export default function FriendRequestsDropdown({
       </button>
 
       {showRequestDropdown && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-gray-700 bg-gray-800 p-3 shadow-lg">
+        <div className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-white/10 bg-app-surface p-3 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
           <h3 className="mb-2 font-semibold text-white">Incoming Requests</h3>
           {incomingRequests.length === 0 ? (
             <div className="text-sm text-gray-400">No requests</div>
@@ -278,7 +278,7 @@ export default function FriendRequestsDropdown({
                       ? "border border-green-400/50 bg-green-500/30"
                       : req.responseStatus === "rejected"
                         ? "border border-red-400/50 bg-red-500/30"
-                        : "border border-transparent hover:bg-gray-700/50"
+                        : "border border-transparent hover:bg-white/[0.06]"
                   }`}
                 >
                   <button

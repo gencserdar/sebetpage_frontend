@@ -23,7 +23,7 @@ export default function ProfileBioModal({ bio, nickname, onClose }: ProfileBioMo
       role="presentation"
     >
       <div
-        className="relative w-full max-w-md rounded-2xl border border-white/20 bg-gray-950/95 p-5 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-white/15 bg-app-surface/95 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

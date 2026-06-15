@@ -84,9 +84,9 @@ export default function ExpandedMessagesRail({
     group.title?.trim() || "Group Chat";
 
   return (
-    <div className="group fixed left-0 top-0 z-[60] h-screen w-14 overflow-hidden border-r border-gray-800/60 bg-gray-950/95 text-white shadow-2xl transition-[width] duration-200 hover:w-80">
+    <div className="group fixed left-0 top-0 z-[60] h-screen w-14 overflow-hidden border-r border-white/10 bg-app-surface/95 text-white shadow-[0_24px_80px_rgba(0,0,0,0.55)] transition-[width] duration-200 hover:w-80">
       <div className="flex h-full w-80">
-        <div className="flex w-14 flex-shrink-0 flex-col items-center border-r border-gray-800/60 bg-gray-950 py-4">
+        <div className="flex w-14 flex-shrink-0 flex-col items-center border-r border-white/10 bg-app-surface py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300">
             <MessageSquare className="h-5 w-5" />
           </div>
@@ -99,7 +99,7 @@ export default function ExpandedMessagesRail({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <div className="flex border-b border-gray-800/60">
+          <div className="flex border-b border-white/10">
             <button
               onClick={() => setTab("friends")}
               className={`flex-1 px-3 py-3 text-sm font-medium ${

@@ -17,7 +17,7 @@ export default function ProfileConfirmationModal({
       onClick={onClose}
     >
       <div
-        className="mx-4 w-full max-w-md rounded-2xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-md"
+        className="mx-4 w-full max-w-md rounded-2xl border border-white/15 bg-app-surface/95 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <h3 className="text-xl font-bold text-white mb-4">Confirm Action</h3>

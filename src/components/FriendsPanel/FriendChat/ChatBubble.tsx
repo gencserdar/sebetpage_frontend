@@ -19,7 +19,7 @@ export default function ChatBubble({
   const mine = m.senderId === myUserId;
   const bubbleCls = mine
     ? "bg-indigo-500/80 text-white border border-indigo-400/20"
-    : "bg-gray-800/80 text-gray-100 border border-gray-700/40";
+    : "border border-white/10 bg-white/[0.08] text-gray-100";
 
   return (
     <div className={`w-full flex mb-1 ${mine ? "justify-end" : "justify-start"}`}>

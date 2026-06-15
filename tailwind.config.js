@@ -3,6 +3,12 @@ module.exports = {
   content: ["./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      colors: {
+        app: {
+          bg: "#08080a",
+          surface: "#101018",
+        },
+      },
       keyframes: {
         fadeInMove: {
           "0%": { opacity: "0", transform: "translateY(-3px) scale(0.95)" },

@@ -76,7 +76,7 @@ function MemberRow({
       className={`relative flex items-center gap-3 rounded-xl border px-3 py-2 transition ${
         online
           ? "border-emerald-400/25 bg-emerald-500/10"
-          : "border-gray-800 bg-white/[0.03]"
+          : "border-white/10 bg-white/[0.03]"
       }`}
     >
       <button
@@ -92,7 +92,7 @@ function MemberRow({
             className="h-9 w-9 rounded-full object-cover"
           />
           <span
-            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-gray-950 ${
+            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-app-surface ${
               online ? "bg-emerald-400" : "bg-gray-500"
             }`}
             title={online ? "Online" : "Offline"}
@@ -141,7 +141,7 @@ function MemberRow({
       )}
 
       {!blocked && permissionUserId === p.userId && (
-        <div className="absolute right-2 top-11 z-10 w-64 rounded-xl border border-gray-700 bg-gray-900 p-3 shadow-2xl">
+        <div className="absolute right-2 top-11 z-10 w-64 rounded-xl border border-white/10 bg-app-surface p-3 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
             Permissions
           </div>
@@ -161,7 +161,7 @@ function MemberRow({
                   className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition ${
                     checked
                       ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-100"
-                      : "border-gray-800 bg-white/[0.03] text-gray-300 hover:border-emerald-700/60 hover:bg-emerald-950/45 hover:text-emerald-100"
+                      : "border-white/10 bg-white/[0.03] text-gray-300 hover:border-emerald-700/60 hover:bg-emerald-950/45 hover:text-emerald-100"
                   } ${canToggle && !saving ? "" : "cursor-not-allowed opacity-45"}`}
                 >
                   <span>{row.label}</span>
@@ -218,12 +218,12 @@ export default function GroupSettingsMembersSection({
           onChange={(e) => onMemberSearchChange(e.target.value)}
           type="search"
           placeholder="Filter members..."
-          className="w-full rounded-xl border border-gray-800 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-gray-100 outline-none transition placeholder:text-gray-600 focus:border-indigo-500/60 focus:bg-white/[0.06]"
+          className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-gray-100 outline-none transition placeholder:text-gray-600 focus:border-indigo-500/60 focus:bg-white/[0.06]"
         />
       </div>
       <div className="space-y-2">
         {shownCount === 0 ? (
-          <div className="rounded-xl border border-gray-800 bg-white/[0.02] px-3 py-4 text-center text-sm text-gray-500">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-4 text-center text-sm text-gray-500">
             No members found.
           </div>
         ) : (

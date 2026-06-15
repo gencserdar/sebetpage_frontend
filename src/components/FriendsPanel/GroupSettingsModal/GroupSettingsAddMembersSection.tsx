@@ -43,7 +43,7 @@ export default function GroupSettingsAddMembersSection({
         className={`flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
           canAddMembers
             ? "border-indigo-400/35 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25"
-            : "cursor-not-allowed border-gray-800 bg-white/[0.02] text-gray-600 opacity-60"
+            : "cursor-not-allowed border-white/10 bg-white/[0.02] text-gray-600 opacity-60"
         } disabled:cursor-not-allowed`}
       >
         <UserPlus className="h-4 w-4" />
@@ -53,7 +53,7 @@ export default function GroupSettingsAddMembersSection({
       {showPanel && canAddMembers && (
         <div
           ref={addPanelRef}
-          className="absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border border-gray-700/50 bg-gray-900 p-3 shadow-2xl"
+          className="absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border border-white/10 bg-app-surface p-3 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         >
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
             Add friends
@@ -65,7 +65,7 @@ export default function GroupSettingsAddMembersSection({
               placeholder="Search friends..."
               value={addSearch}
               onChange={(e) => onAddSearchChange(e.target.value)}
-              className="w-full rounded-lg bg-gray-800 py-2 pl-8 pr-3 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500/60"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] py-2 pl-8 pr-3 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500/60"
               autoFocus
             />
           </div>

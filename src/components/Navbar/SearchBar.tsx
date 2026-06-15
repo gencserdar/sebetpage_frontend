@@ -136,7 +136,7 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
       return (
         <div className="p-4 text-center text-gray-400">
           <div className="flex items-center justify-center gap-2">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
             <span>Searching...</span>
           </div>
         </div>
@@ -170,8 +170,8 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
                 onClick={() => handleResultClick(result)}
                 className="flex w-full min-h-[3rem] items-center gap-3 px-4 py-2 text-left transition-colors active:bg-white/10"
               >
-                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-r from-orange-500 to-pink-500 p-0.5">
-                  <div className="h-full w-full overflow-hidden rounded-full bg-gray-800">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 p-0.5">
+                  <div className="h-full w-full overflow-hidden rounded-full bg-app-surface">
                     <img
                       src={result.profileImageUrl || "https://via.placeholder.com/300"}
                       alt="Profile"
@@ -203,7 +203,7 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
                 onClick={() => handleResultClick(community)}
                 className="flex w-full min-h-[3rem] items-center gap-3 px-4 py-2 text-left transition-colors active:bg-white/10"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-yellow-500 font-semibold text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-indigo-400 to-violet-400 font-semibold text-white">
                   {community.name[0]}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -227,15 +227,15 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
       <div
         className={`${
           embedded ? "relative mt-2" : "absolute left-0 right-0 top-full z-50 mt-2"
-        } overflow-hidden rounded-xl border border-gray-600 bg-gray-900 shadow-xl`}
+        } overflow-hidden rounded-xl border border-white/10 bg-app-surface shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
       >
-        <div className="flex border-b border-gray-700">
+        <div className="flex border-b border-white/10">
           <button
             type="button"
             onClick={() => setSearchFilter("users")}
             className={`min-h-[2.75rem] flex-1 px-4 text-sm font-medium transition-colors ${
               searchFilter === "users"
-                ? "border-b-2 border-purple-400 bg-gray-800/50 text-purple-400"
+                ? "border-b-2 border-indigo-400 bg-white/[0.06] text-indigo-300"
                 : "text-gray-400 active:bg-white/5"
             }`}
           >
@@ -246,7 +246,7 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
             onClick={() => setSearchFilter("communities")}
             className={`min-h-[2.75rem] flex-1 px-4 text-sm font-medium transition-colors ${
               searchFilter === "communities"
-                ? "border-b-2 border-purple-400 bg-gray-800/50 text-purple-400"
+                ? "border-b-2 border-indigo-400 bg-white/[0.06] text-indigo-300"
                 : "text-gray-400 active:bg-white/5"
             }`}
           >
@@ -273,7 +273,7 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         onFocus={handleSearchFocus}
-        className="w-full min-w-0 rounded-xl border border-gray-600 bg-gray-800/50 py-3 pl-10 pr-4 text-base text-white placeholder-gray-400 focus:border-purple-500 focus:bg-gray-800 focus:outline-none md:rounded-full md:py-2 md:text-sm"
+        className="w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.06] py-3 pl-10 pr-4 text-base text-white placeholder-gray-400 focus:border-indigo-400/50 focus:bg-white/[0.08] focus:outline-none focus:ring-1 focus:ring-indigo-500/40 md:rounded-full md:py-2 md:text-sm"
       />
       {renderDropdown()}
     </div>

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import AppAmbientGlow from "../components/AppAmbientGlow";
 import PasswordRequirements from "../components/PasswordRequirements";
 import { register, resendActivationEmail } from "../services/authService";
 import { isPasswordValid } from "../utils/passwordPolicy";
+import { appPageClass, appSurfaceCardClass } from "../theme/appTheme";
 
 export default function RegisterPage() {
   const [firstName, setFirst]       = useState("");
@@ -43,7 +45,9 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0f0f11] flex flex-col items-center justify-center text-white relative">
+    <div className={`${appPageClass} items-center justify-center`}>
+      <AppAmbientGlow />
+
       {/* Logo & Welcome */}
       <div className="mb-8 text-center flex flex-col items-center">
         <img
@@ -62,7 +66,7 @@ export default function RegisterPage() {
 
 
       {registered ? (
-        <div className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-xl p-8 text-center">
+        <div className={`relative w-full max-w-md p-8 text-center ${appSurfaceCardClass}`}>
           <h2 className="text-2xl font-bold mb-4">Check Your Email</h2>
           <p className="text-gray-300 mb-4">
             We&apos;ve sent you a confirmation link. Please verify your email to log in.
@@ -117,14 +121,14 @@ export default function RegisterPage() {
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-xl p-8 space-y-5"
+          className={`relative w-full max-w-md space-y-5 p-8 ${appSurfaceCardClass}`}
         >
           {error && <div className="text-red-400 text-sm">{error}</div>}
 
           <input
             type="text"
             placeholder="First name"
-            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             value={firstName}
             onChange={(e) => setFirst(e.target.value)}
             disabled={isSubmitting}
@@ -133,7 +137,7 @@ export default function RegisterPage() {
           <input
             type="text"
             placeholder="Last name"
-            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             value={lastName}
             onChange={(e) => setLast(e.target.value)}
             disabled={isSubmitting}
@@ -142,7 +146,7 @@ export default function RegisterPage() {
           <input
             type="email"
             placeholder="Email"
-            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isSubmitting}
@@ -152,7 +156,7 @@ export default function RegisterPage() {
             <input
               type="password"
               placeholder="Password"
-              className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -167,7 +171,7 @@ export default function RegisterPage() {
             <input
               type="password"
               placeholder="Confirm Password"
-              className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
               value={confirmPassword}
               onChange={(e) => {
                 setConf(e.target.value);
@@ -186,7 +190,7 @@ export default function RegisterPage() {
           <input
             type="text"
             placeholder="Username"
-            className="w-full px-4 py-2 rounded-lg bg-white/10 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             disabled={isSubmitting}

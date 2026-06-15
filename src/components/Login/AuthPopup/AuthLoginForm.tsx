@@ -37,7 +37,7 @@ export default function AuthLoginForm({
           required
           value={email}
           onChange={(e) => onEmailChange(e.target.value)}
-          className="w-full rounded-md bg-[#322f45] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
         />
         <input
           type="password"
@@ -45,7 +45,7 @@ export default function AuthLoginForm({
           required
           value={password}
           onChange={(e) => onPasswordChange(e.target.value)}
-          className="w-full rounded-md bg-[#322f45] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
         />
 
         <div className="text-right">
@@ -88,9 +88,9 @@ export default function AuthLoginForm({
         </button>
 
         <div className="flex items-center my-4">
-          <div className="flex-grow h-px bg-gray-700"></div>
+          <div className="h-px flex-grow bg-white/10"></div>
           <span className="px-3 text-sm text-gray-400">or</span>
-          <div className="flex-grow h-px bg-gray-700"></div>
+          <div className="h-px flex-grow bg-white/10"></div>
         </div>
 
         <button
@@ -120,7 +120,7 @@ export default function AuthLoginForm({
 
         <button
           type="button"
-          className="w-full flex items-center justify-center gap-2 py-2 rounded-md bg-black text-white hover:bg-gray-900 transition"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] py-2 text-white transition hover:bg-white/[0.1]"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

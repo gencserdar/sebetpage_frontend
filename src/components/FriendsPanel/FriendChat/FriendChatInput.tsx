@@ -18,7 +18,7 @@ export default function FriendChatInput({
   onSend,
 }: FriendChatInputProps) {
   return (
-    <div className="flex items-center gap-2 border-t border-gray-800/40 pt-3">
+    <div className="flex items-center gap-2 border-t border-white/10 pt-3">
       <input
         ref={inputRef}
         value={inputValue}
@@ -35,8 +35,8 @@ export default function FriendChatInput({
         spellCheck={false}
         className={`flex-1 p-2 rounded-xl text-white placeholder-gray-500 outline-none border-none focus:ring-2 border backdrop-blur-sm ${
           isRemoved || isSending
-            ? "bg-gray-900/50 border-gray-800/60 cursor-not-allowed"
-            : "bg-gray-800/80 border-gray-750/40 focus:ring-indigo-500/60"
+            ? "cursor-not-allowed border-white/10 bg-white/[0.04]"
+            : "border-white/10 bg-white/[0.06] focus:ring-indigo-500/60"
         }`}
         placeholder={
           isRemoved ? "Friendship ended..." : isSending ? "Sending..." : "Type a message…"
@@ -47,7 +47,7 @@ export default function FriendChatInput({
         onClick={onSend}
         className={`px-3 py-2 rounded-xl transition-colors duration-200 border-none backdrop-blur-sm flex items-center justify-center min-w-[60px] ${
           isRemoved || !conversationId || isSending
-            ? "bg-gray-800/50 border-gray-700/40 text-gray-500 cursor-not-allowed"
+            ? "cursor-not-allowed border-white/10 bg-white/[0.04] text-gray-500"
             : "bg-indigo-500/80 hover:bg-indigo-400/80 border-indigo-400/20 text-white"
         }`}
         disabled={!conversationId || isRemoved || isSending}

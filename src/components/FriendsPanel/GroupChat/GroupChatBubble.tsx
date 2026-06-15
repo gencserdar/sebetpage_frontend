@@ -45,7 +45,7 @@ export default function GroupChatBubble({
           className={`inline-block break-words rounded-2xl px-3 py-1 shadow-lg ${
             mine
               ? `border border-indigo-400/20 bg-indigo-500/80 text-white ${showHeader ? "rounded-tr-none" : ""}`
-              : `border border-gray-700/40 bg-gray-800/80 text-gray-100 ${showHeader ? "rounded-tl-none" : ""}`
+              : `border border-white/10 bg-white/[0.08] text-gray-100 ${showHeader ? "rounded-tl-none" : ""}`
           }`}
         >
           {m.content}

@@ -12,7 +12,7 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: AuthPopupP
   const form = useAuthForm({ initialMode, onSubmit });
 
   return (
-    <div className="relative flex flex-col md:flex-row text-white rounded-2xl overflow-hidden w-full max-w-4xl bg-white/10 backdrop-blur-xl backdrop-saturate-200 bg-gradient-to-br from-white/20 via-white/5 to-white/10 border border-white/20 shadow-lg shadow-black/40">
+    <div className="relative flex flex-col md:flex-row text-white rounded-2xl overflow-hidden w-full max-w-4xl border border-white/15 bg-app-surface/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
       <AuthImageSlider
         sliderRef={slider.sliderRef}
         currentIndex={slider.currentIndex}

@@ -55,7 +55,7 @@ export default function UserMenu({ onAuthClick, inline = false, onNavigate }: Us
         onClick={onAuthClick}
         onMouseMove={handleMouseMove}
         style={{
-          background: `radial-gradient(circle at ${hoverPos.x}% ${hoverPos.y}%, #6366f1, #8b5cf6, #ec4899)`,
+          background: `radial-gradient(circle at ${hoverPos.x}% ${hoverPos.y}%, #6366f1, #8b5cf6, #a78bfa)`,
           transition: "background 0.2s ease-out",
         }}
         className="shrink-0 rounded-full px-4 py-1.5 text-sm font-medium text-white sm:px-5 sm:py-2"
@@ -67,7 +67,7 @@ export default function UserMenu({ onAuthClick, inline = false, onNavigate }: Us
 
   if (loading) {
     return (
-      <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-gray-700 md:w-24" />
+      <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-white/10 md:w-24" />
     );
   }
 
@@ -137,15 +137,15 @@ export default function UserMenu({ onAuthClick, inline = false, onNavigate }: Us
       </button>
 
       {dropdownOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-gray-700 bg-gray-800 shadow-lg sm:w-48">
-          <button type="button" onClick={handleProfileClick} className="block w-full px-4 py-2 text-left transition-colors hover:bg-gray-700">
+        <div className="absolute right-0 z-50 mt-2 w-44 rounded-xl border border-white/10 bg-app-surface shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:w-48">
+          <button type="button" onClick={handleProfileClick} className="block w-full px-4 py-2 text-left transition-colors hover:bg-white/[0.08]">
             Profile
           </button>
-          <button type="button" onClick={handleSettingsClick} className="block w-full px-4 py-2 text-left transition-colors hover:bg-gray-700">
+          <button type="button" onClick={handleSettingsClick} className="block w-full px-4 py-2 text-left transition-colors hover:bg-white/[0.08]">
             Settings
           </button>
-          <hr className="border-gray-700" />
-          <button type="button" onClick={() => void handleLogout()} className="block w-full px-4 py-2 text-left text-red-400 transition-colors hover:bg-gray-700">
+          <hr className="border-white/10" />
+          <button type="button" onClick={() => void handleLogout()} className="block w-full px-4 py-2 text-left text-red-400 transition-colors hover:bg-white/[0.08]">
             Log out
           </button>
         </div>

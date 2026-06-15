@@ -40,7 +40,7 @@ export default function DaySeparator({ label, listRef }: DaySeparatorProps) {
         scrolling || !fadeOut ? "opacity-80" : "opacity-0"
       }`}
     >
-      <span className="text-xs px-3 py-2 rounded-full bg-gray-800 text-gray-400 border border-gray-700/30">
+      <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs text-gray-400">
         {label}
       </span>
     </div>

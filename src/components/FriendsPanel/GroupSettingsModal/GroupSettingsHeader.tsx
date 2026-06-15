@@ -6,7 +6,7 @@ interface GroupSettingsHeaderProps {
 
 export default function GroupSettingsHeader({ onClose }: GroupSettingsHeaderProps) {
   return (
-    <div className="relative z-30 flex shrink-0 items-center justify-between border-b border-gray-800 bg-gray-950 px-4 py-3">
+    <div className="relative z-30 flex shrink-0 items-center justify-between border-b border-white/10 bg-app-surface px-4 py-3">
       <h2 className="text-base font-semibold">Group settings</h2>
       <button
         type="button"
@@ -15,7 +15,7 @@ export default function GroupSettingsHeader({ onClose }: GroupSettingsHeaderProp
           event.stopPropagation();
           onClose();
         }}
-        className="relative z-30 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-gray-400 transition active:bg-gray-800 active:text-white"
+        className="relative z-30 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-gray-400 transition active:bg-white/10 active:text-white"
         title="Close"
         aria-label="Close group settings"
       >

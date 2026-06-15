@@ -21,7 +21,7 @@ export default function ProfileVerifyModal({
 }: ProfileVerifyModalProps) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
-      <div className="bg-gray-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-app-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <h3 className="text-white text-lg font-semibold mb-2">
           {verify.kind === "email"
             ? "Confirm new email"

@@ -160,7 +160,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="relative sticky top-0 z-50 border-b border-white/10 bg-[#08080a]">
+    <header className="relative sticky top-0 z-50 border-b border-white/10 bg-app-bg">
       <div className="flex min-w-0 items-center gap-3 px-3 py-2 sm:px-4 sm:py-2.5 lg:justify-between lg:gap-0 lg:px-8 lg:py-3">
         <div className="flex min-w-0 shrink-0 items-center">
           <Link
@@ -257,7 +257,7 @@ export default function Navbar({
       {mobilePanel === "nav" && (
         <nav
           id="mobile-main-nav"
-          className="relative z-50 border-t border-white/10 bg-[#08080a] lg:hidden"
+          className="relative z-50 border-t border-white/10 bg-app-bg lg:hidden"
           aria-label="Main navigation"
         >
           {NAV_ITEMS.map(({ label, title }) => (
@@ -278,7 +278,7 @@ export default function Navbar({
       {mobilePanel === "requests" && user && !loading && (
         <div
           id="mobile-requests-nav"
-          className="relative z-50 max-h-[min(70vh,32rem)] overflow-y-auto border-t border-white/10 bg-[#08080a] lg:hidden indigo-scrollbar"
+          className="relative z-50 max-h-[min(70vh,32rem)] overflow-y-auto border-t border-white/10 bg-app-bg lg:hidden indigo-scrollbar"
         >
           <FriendRequestsDropdown
             inline
@@ -291,7 +291,7 @@ export default function Navbar({
       {mobilePanel === "profile" && user && !loading && (
         <div
           id="mobile-profile-nav"
-          className="relative z-50 max-h-[min(70vh,32rem)] overflow-y-auto border-t border-white/10 bg-[#08080a] lg:hidden indigo-scrollbar"
+          className="relative z-50 max-h-[min(70vh,32rem)] overflow-y-auto border-t border-white/10 bg-app-bg lg:hidden indigo-scrollbar"
         >
           <SearchBar embedded onResultSelect={closePanels} />
           <UserMenu inline onAuthClick={onAuthClick} onNavigate={closePanels} />

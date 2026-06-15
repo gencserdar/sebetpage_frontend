@@ -188,13 +188,13 @@ export default function FriendsPanel({
                   leaveFrom="translate-y-0 md:translate-x-0"
                   leaveTo="translate-y-full md:translate-y-0 md:translate-x-full"
                 >
-                  <Dialog.Panel className="flex h-full w-full flex-col border-gray-800/40 bg-gray-950/98 text-white shadow-2xl backdrop-blur-xl md:w-[350px] md:border-l">
-                    <div className="flex items-center justify-between border-b border-gray-800/40 bg-gray-900/80 p-4">
+                  <Dialog.Panel className="flex h-full w-full flex-col border-white/10 bg-app-surface/95 text-white shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl md:w-[350px] md:border-l">
+                    <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
                       <h2 className="text-lg font-semibold text-gray-100">Messages</h2>
                       <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 transition-colors duration-200 hover:bg-gray-800/60 hover:text-white"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white"
                         title="Close"
                         aria-label="Close messages"
                       >
@@ -202,14 +202,14 @@ export default function FriendsPanel({
                       </button>
                     </div>
 
-                    <div className="flex border-b border-gray-800/40 bg-gray-900/50">
+                    <div className="flex border-b border-white/10 bg-black/20">
                       <button
                         type="button"
                         onClick={() => setActiveTab("friends")}
                         className={`flex flex-1 items-center justify-center px-2 py-3 text-sm font-medium transition-all duration-200 ${
                           activeTab === "friends"
-                            ? "border-b-2 border-indigo-400 bg-gray-900/60 text-white"
-                            : "text-gray-500 hover:bg-gray-900/30 hover:text-gray-300"
+                            ? "border-b-2 border-indigo-400 bg-white/[0.06] text-white"
+                            : "text-gray-500 hover:bg-white/[0.04] hover:text-gray-300"
                         }`}
                       >
                         Friends
@@ -220,8 +220,8 @@ export default function FriendsPanel({
                         onClick={() => setActiveTab("groups")}
                         className={`flex flex-1 items-center justify-center px-2 py-3 text-sm font-medium transition-all duration-200 ${
                           activeTab === "groups"
-                            ? "border-b-2 border-indigo-400 bg-gray-900/60 text-white"
-                            : "text-gray-500 hover:bg-gray-900/30 hover:text-gray-300"
+                            ? "border-b-2 border-indigo-400 bg-white/[0.06] text-white"
+                            : "text-gray-500 hover:bg-white/[0.04] hover:text-gray-300"
                         }`}
                       >
                         Groups
@@ -229,17 +229,7 @@ export default function FriendsPanel({
                       </button>
                     </div>
 
-                    <div className="custom-scrollbar flex-1 overflow-y-auto bg-gradient-to-b from-gray-950/60 to-black/80 p-3">
-                      <style
-                        dangerouslySetInnerHTML={{
-                          __html: `
-                          .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-                          .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,.4); border-radius: 10px; }
-                          .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,.5); border-radius: 10px; }
-                          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.7); }
-                        `,
-                        }}
-                      />
+                    <div className="indigo-scrollbar flex-1 overflow-y-auto bg-gradient-to-b from-app-surface/40 to-app-bg/80 p-3">
 
                       {activeTab === "friends" && (
                         <FriendsList onSelectFriend={setSelectedFriend} />
@@ -289,7 +279,7 @@ export default function FriendsPanel({
                                   <Badge count={unread} />
                                   <button
                                     onClick={() => setSettingsGroupId(g.id)}
-                                    className="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-800/70 hover:text-white"
+                                    className="rounded-lg p-1.5 text-gray-500 transition hover:bg-white/[0.08] hover:text-white"
                                     title="Group settings"
                                   >
                                     <Settings className="h-4 w-4" />

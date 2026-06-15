@@ -24,7 +24,7 @@ export default function GroupSettingsTitleSection({
   onSave,
 }: GroupSettingsTitleSectionProps) {
   return (
-    <div className="border-b border-gray-800 px-4 py-4">
+    <div className="border-b border-white/10 px-4 py-4">
       <div className="flex items-center justify-center gap-2">
         {editingTitle ? (
           <>
@@ -35,7 +35,7 @@ export default function GroupSettingsTitleSection({
                 if (e.key === "Enter") onSave();
                 if (e.key === "Escape") onCancelEdit();
               }}
-              className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-white/10 px-4 py-3 text-white outline-none focus:border-indigo-400"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-white outline-none focus:border-indigo-400"
               autoFocus
             />
             <button
@@ -63,7 +63,7 @@ export default function GroupSettingsTitleSection({
             {canEditName && (
               <button
                 onClick={onStartEdit}
-                className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-800 hover:text-white"
+                className="rounded-lg p-1.5 text-gray-400 transition hover:bg-white/[0.08] hover:text-white"
                 title="Change name"
               >
                 <Edit3 className="h-4 w-4" />

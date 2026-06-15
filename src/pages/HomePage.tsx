@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react";
 import Modal from "../components/Login/Modal";
 import AuthPopup from "../components/Login/AuthPopup/index";
+import AppAmbientGlow from "../components/AppAmbientGlow";
 import Navbar from "../components/Navbar/Navbar";
 import { useUser } from "../context/UserContext";
 import { UserDTO } from "../types/userDTO";
@@ -12,6 +13,7 @@ import GroupChat from "../components/FriendsPanel/GroupChat/index";
 import ExpandedMessagesRail from "../components/FriendsPanel/ExpandedMessagesRail";
 import { useChatSocketContext } from "../context/ChatSocketContext";
 import { MessagingGroup, MessagingGroupDetail } from "../services/chatApiService";
+import { appGradientBtnClass, appGradientHeadingClass, appPageClass } from "../theme/appTheme";
 
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -103,15 +105,16 @@ export default function HomePage() {
 
   if (userLoading) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col">
-        <div className="transition-all duration-300">
+      <div className={appPageClass}>
+        <AppAmbientGlow />
+        <div className="relative transition-all duration-300">
           <Navbar onAuthClick={handleAuthClick} />
         </div>
-        <main className="flex flex-1 items-center justify-center px-4">
+        <main className="relative flex flex-1 items-center justify-center px-4">
           <div className="flex w-full max-w-2xl flex-col items-center gap-6">
-            <div className="h-12 w-3/4 max-w-lg rounded-full bg-white/[0.06] animate-pulse" />
-            <div className="h-5 w-1/2 max-w-sm rounded-full bg-white/[0.04] animate-pulse" />
-            <div className="mt-4 h-10 w-36 rounded-full bg-white/[0.05] animate-pulse" />
+            <div className="h-12 w-3/4 max-w-lg animate-pulse rounded-full bg-white/[0.06]" />
+            <div className="h-5 w-1/2 max-w-sm animate-pulse rounded-full bg-white/[0.04]" />
+            <div className="mt-4 h-10 w-36 animate-pulse rounded-full bg-white/[0.05]" />
           </div>
         </main>
       </div>
@@ -135,9 +138,11 @@ export default function HomePage() {
   ) : null;
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div className={appPageClass}>
+      <AppAmbientGlow />
+
       {/* Navbar */}
-      <div className="transition-all duration-300">
+      <div className="relative transition-all duration-300">
         <Navbar
           onAuthClick={handleAuthClick}
           onMessagesClick={() => setShowFriendsPanel(true)}
@@ -146,13 +151,13 @@ export default function HomePage() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 transition-all duration-300">
+      <div className="relative flex-1 transition-all duration-300">
         {/* Hero Section */}
-        <section className="flex flex-col items-center justify-center text-center px-4 py-24 md:py-40">
-          <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-400 bg-clip-text text-transparent">
+        <section className="flex flex-col items-center justify-center px-4 py-24 text-center md:py-40">
+          <h1 className={`mb-6 text-4xl font-bold leading-tight md:text-6xl ${appGradientHeadingClass}`}>
             {user ? "Welcome back!" : "Create. Share. Connect."}
           </h1>
-          <p className="text-gray-300 max-w-xl mb-8 text-lg">
+          <p className="mb-8 max-w-xl text-lg text-gray-300">
             {user
               ? "This is your personalized dashboard."
               : "SebetPage helps you turn your creative passion into a meaningful experience."}
@@ -160,7 +165,7 @@ export default function HomePage() {
           {!user && (
             <button
               onClick={handleAuthClick}
-              className="px-8 py-3 text-lg rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:opacity-80 font-medium transition"
+              className={`rounded-full px-8 py-3 text-lg font-medium ${appGradientBtnClass}`}
             >
               Get Started
             </button>

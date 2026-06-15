@@ -29,7 +29,7 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
         `}
       </style>
       <div
-        className="relative flex h-[82vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 text-white shadow-2xl"
+        className="relative flex h-[82vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-app-surface text-white shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}
       >
@@ -50,7 +50,7 @@ export default function GroupSettingsModal(props: GroupSettingsModalProps) {
                 onUploadPhoto={settings.uploadPhoto}
               />
 
-              <div className="relative z-10 -mt-28 bg-gray-950 pb-5 before:pointer-events-none before:absolute before:bottom-full before:left-0 before:right-0 before:h-28 before:bg-gradient-to-b before:from-transparent before:via-gray-950/70 before:to-gray-950 before:content-['']">
+              <div className="relative z-10 -mt-28 bg-app-surface pb-5 before:pointer-events-none before:absolute before:bottom-full before:left-0 before:right-0 before:h-28 before:bg-gradient-to-b before:from-transparent before:via-app-surface/70 before:to-app-surface before:content-['']">
                 <GroupSettingsTitleSection
                   displayName={settings.displayName}
                   editingTitle={settings.editingTitle}

@@ -30,7 +30,7 @@ export default function GroupSettingsDescriptionSection({
         {canEditDescription && !editingDescription && (
           <button
             onClick={onStartEdit}
-            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-800 hover:text-white"
+            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-white/[0.08] hover:text-white"
             title="Edit description"
           >
             <Edit3 className="h-4 w-4" />
@@ -46,7 +46,7 @@ export default function GroupSettingsDescriptionSection({
               if (e.key === "Escape") onCancelEdit();
             }}
             rows={3}
-            className="min-w-0 flex-1 resize-none rounded-lg border border-gray-700 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-indigo-400"
+            className="min-w-0 flex-1 resize-none rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-indigo-400"
             autoFocus
           />
           <button

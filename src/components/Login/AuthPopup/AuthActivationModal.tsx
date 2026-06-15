@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { resendActivationEmail } from "../../../services/authService";
+import { appModalShellClass } from "../../../theme/appTheme";
 
 interface AuthActivationModalProps {
   email: string;
@@ -26,8 +27,8 @@ export default function AuthActivationModal({ email, onClose }: AuthActivationMo
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <div className="bg-white/10 backdrop-blur-xl backdrop-saturate-200 bg-gradient-to-br from-white/10 to-white/5 text-white rounded-2xl p-6 shadow-lg max-w-sm w-full text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className={`max-w-sm w-full p-6 text-center ${appModalShellClass}`}>
         <h3 className="text-lg font-semibold mb-2">Activate your email</h3>
         <p className="text-gray-300 text-sm mb-4">
           You haven&apos;t activated your account yet. Check your inbox or request a new link.
@@ -44,7 +45,7 @@ export default function AuthActivationModal({ email, onClose }: AuthActivationMo
               type="button"
               onClick={handleResend}
               disabled={sending}
-              className="w-full mb-3 px-4 py-2 bg-[#635bff] text-white rounded-lg hover:bg-[#5146ff] disabled:cursor-not-allowed disabled:opacity-50 transition-colors flex items-center justify-center min-h-[40px]"
+              className="mb-3 flex min-h-[40px] w-full items-center justify-center rounded-lg bg-indigo-500 px-4 py-2 text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import AppAmbientGlow from "../components/AppAmbientGlow";
 import { activateAccount } from "../services/authService";
+import { appPageClass, appSurfaceCardClass } from "../theme/appTheme";
 
 type Status = "loading" | "success" | "error";
 
@@ -46,8 +48,10 @@ export default function ActivatePage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0f0f11] flex flex-col items-center justify-center text-white relative">
-      <div className="mb-8 text-center flex flex-col items-center">
+    <div className={`${appPageClass} items-center justify-center`}>
+      <AppAmbientGlow />
+
+      <div className="relative mb-8 flex flex-col items-center text-center">
         <img
           src="/img4.png"
           alt="SebetPage Logo"
@@ -58,7 +62,7 @@ export default function ActivatePage() {
         )}
       </div>
 
-      <div className="w-full max-w-md bg-white/10 backdrop-blur-xl rounded-xl p-8 text-center">
+      <div className={`relative w-full max-w-md p-8 text-center ${appSurfaceCardClass}`}>
         {status === "loading" && (
           <>
             <h2 className="text-2xl font-bold mb-4">Activating your account</h2>

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import AppAmbientGlow from "../components/AppAmbientGlow";
 import PasswordRequirements from "../components/PasswordRequirements";
 import { resetPassword } from "../services/authService";
 import { isPasswordValid } from "../utils/passwordPolicy";
+import { appPageClass, appSurfaceCardClass } from "../theme/appTheme";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -39,8 +41,9 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
-      <div className="bg-[#1f1f1f] p-8 rounded-2xl shadow-lg w-full max-w-md text-white">
+    <div className={`${appPageClass} items-center justify-center`}>
+      <AppAmbientGlow />
+      <div className={`relative w-full max-w-md p-8 text-white ${appSurfaceCardClass}`}>
         {/* Logo */}
         <div className="flex justify-center">
           <img src="/img4.png" alt="Logo" className="w-32 h-32" />
@@ -61,7 +64,7 @@ export default function ResetPasswordPage() {
                 setPassword(e.target.value);
                 if (error) setError(null);
               }}
-              className="w-full rounded-md bg-[#2c2c2c] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#635bff]"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               required
             />
             <PasswordRequirements password={password} />
@@ -75,7 +78,7 @@ export default function ResetPasswordPage() {
                 setConfirmPassword(e.target.value);
                 if (error) setError(null);
               }}
-              className="w-full rounded-md bg-[#2c2c2c] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#635bff]"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               required
             />
             <PasswordRequirements
@@ -92,7 +95,7 @@ export default function ResetPasswordPage() {
               !confirmPassword ||
               password !== confirmPassword
             }
-            className="w-full py-2 rounded-md bg-[#635bff] hover:bg-[#5146ff] disabled:cursor-not-allowed disabled:bg-[#635bff]/40 transition font-medium"
+            className="w-full rounded-lg bg-indigo-500 py-2 font-medium transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-indigo-500/40"
           >
             Reset Password
           </button>

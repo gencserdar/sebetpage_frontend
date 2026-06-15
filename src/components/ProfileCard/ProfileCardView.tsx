@@ -46,7 +46,7 @@ export default function ProfileCardView({
   if (isEmpty) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center px-8 text-center lg:h-full">
-        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/20 via-violet-500/15 to-indigo-500/10 ring-1 ring-white/10">
+        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 via-violet-500/15 to-indigo-400/10 ring-1 ring-white/10">
           <Sparkles size={28} className="text-violet-300" />
         </div>
 

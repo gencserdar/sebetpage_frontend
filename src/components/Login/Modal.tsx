@@ -19,7 +19,7 @@ export default function Modal({ open, onClose, children }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 1) Tam ekran blur + yarı opak perde */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-[8px]" />
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
 
       {/* 2) İçerik katmanı */}
       <div className="relative z-10 w-full max-w-4xl px-4">

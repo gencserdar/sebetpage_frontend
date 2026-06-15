@@ -52,7 +52,7 @@ export default function GroupChatHeader({
   onAddMember,
 }: GroupChatHeaderProps) {
   return (
-    <div className="relative mb-3 flex items-center justify-between border-b border-gray-800/40 pb-3">
+    <div className="relative mb-3 flex items-center justify-between border-b border-white/10 pb-3">
       <div className="min-w-0">
         <button
           type="button"
@@ -79,7 +79,7 @@ export default function GroupChatHeader({
             className={`rounded-lg p-1.5 transition-colors ${
               showAddPanel
                 ? "bg-indigo-500/30 text-indigo-300"
-                : "text-gray-500 hover:bg-gray-800/60 hover:text-white"
+                : "text-gray-500 hover:bg-white/[0.08] hover:text-white"
             }`}
             title="Add people"
           >
@@ -89,21 +89,21 @@ export default function GroupChatHeader({
         <button
           type="button"
           onClick={onToggleExpanded}
-          className="hidden rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-800/60 hover:text-white md:block"
+          className="hidden rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-white/[0.08] hover:text-white md:block"
           title={isExpanded ? "Collapse" : "Expand"}
         >
           {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
         <button
           onClick={onOpenSettings}
-          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-800/60 hover:text-white"
+          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-white/[0.08] hover:text-white"
           title="Group settings"
         >
           <Settings className="h-4 w-4" />
         </button>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-800/60 hover:text-white"
+          className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-white/[0.08] hover:text-white"
           title="Close"
         >
           <X className="h-4 w-4" />
@@ -113,7 +113,7 @@ export default function GroupChatHeader({
       {showAddPanel && (
         <div
           ref={addPanelRef}
-          className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-gray-700/50 bg-gray-900 p-3 shadow-2xl"
+          className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-white/10 bg-app-surface p-3 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         >
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Add friends</p>
           <div className="relative mb-2">
@@ -123,7 +123,7 @@ export default function GroupChatHeader({
               placeholder="Search friends..."
               value={addSearch}
               onChange={(e) => onAddSearchChange(e.target.value)}
-              className="w-full rounded-lg bg-gray-800 py-2 pl-8 pr-3 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500/60"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] py-2 pl-8 pr-3 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500/60"
               autoFocus
             />
           </div>

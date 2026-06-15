@@ -26,7 +26,7 @@ export default function AuthForgotForm({
           required
           value={email}
           onChange={(e) => onEmailChange(e.target.value)}
-          className="w-full rounded-md bg-[#322f45] py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
         />
 
         <div className="h-4">

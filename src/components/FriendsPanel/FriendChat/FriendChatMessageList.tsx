@@ -69,7 +69,7 @@ export default function FriendChatMessageList({
   return (
     <div
       ref={listRef}
-      className={`mb-3 overflow-y-auto rounded-xl bg-gradient-to-b from-gray-900/60 to-black/80 p-3 ${
+      className={`mb-3 overflow-y-auto rounded-xl bg-gradient-to-b from-app-surface/40 to-app-bg/80 p-3 ${
         expanded ? "min-h-0 flex-1" : "h-80 max-md:min-h-0 max-md:flex-1"
       }`}
       style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.5) rgba(0,0,0,.4)" }}

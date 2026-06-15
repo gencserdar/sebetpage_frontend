@@ -225,7 +225,7 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
             {/* küçük status noktası */}
             <span
               className={[
-                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-gray-900",
+                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-app-surface",
                 online ? "bg-emerald-400" : "bg-gray-500",
               ].join(" ")}
               title={online ? "Online" : "Offline"}

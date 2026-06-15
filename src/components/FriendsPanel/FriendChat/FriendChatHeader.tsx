@@ -59,7 +59,7 @@ export default function FriendChatHeader({
   setCreatingGroup,
 }: FriendChatHeaderProps) {
   return (
-    <div className="relative flex justify-between items-center mb-3 border-b border-gray-800/40 pb-3">
+    <div className="relative flex justify-between items-center mb-3 border-b border-white/10 pb-3">
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onOpenProfile}
@@ -85,7 +85,7 @@ export default function FriendChatHeader({
           className={`p-1.5 rounded-lg transition-colors duration-200 ${
             showAddPanel
               ? "bg-indigo-500/30 text-indigo-300"
-              : "text-gray-500 hover:text-white hover:bg-gray-800/60"
+              : "text-gray-500 hover:text-white hover:bg-white/[0.08]"
           }`}
           title="Add people to group"
         >
@@ -94,7 +94,7 @@ export default function FriendChatHeader({
 
         <button
           onClick={onToggleExpanded}
-          className="hidden rounded-lg p-1.5 text-gray-500 transition-colors duration-200 hover:bg-gray-800/60 hover:text-white md:block"
+          className="hidden rounded-lg p-1.5 text-gray-500 transition-colors duration-200 hover:bg-white/[0.08] hover:text-white md:block"
           title={isExpanded ? "Collapse" : "Expand"}
         >
           {isExpanded ? <CollapseIcon /> : <ExpandIcon />}
@@ -102,7 +102,7 @@ export default function FriendChatHeader({
 
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-gray-800/60 rounded-lg p-1.5"
+          className="text-gray-500 hover:text-white transition-colors duration-200 hover:bg-white/[0.08] rounded-lg p-1.5"
           title="Close"
         >
           ✕
@@ -112,7 +112,7 @@ export default function FriendChatHeader({
       {showAddPanel && (
         <div
           ref={addPanelRef}
-          className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700/50 rounded-xl shadow-2xl z-30 p-3"
+          className="absolute top-full right-0 z-30 mt-2 w-72 rounded-xl border border-white/10 bg-app-surface p-3 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         >
           <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide flex items-center gap-2">
             Add friends to group
@@ -129,7 +129,7 @@ export default function FriendChatHeader({
               placeholder="Search friends…"
               value={addSearch}
               onChange={(e) => onAddSearchChange(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 bg-gray-800 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:ring-1 focus:ring-indigo-500/60"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.06] py-2 pl-8 pr-3 text-sm text-white placeholder-gray-500 outline-none focus:ring-1 focus:ring-indigo-500/60"
               autoFocus
             />
           </div>
