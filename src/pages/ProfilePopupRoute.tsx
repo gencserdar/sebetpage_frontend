@@ -1,7 +1,7 @@
-import { createPortal } from "react-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import ProfilePopup from "../components/ProfilePopup/index";
+import { ProfilePopupLoadingShell } from "../components/ProfilePopup/ProfilePopupLoadingShell";
 import { useChatSocketContext } from "../context/ChatSocketContext";
 import { useProfileNavigation, ProfileNavState } from "../hooks/useProfileNavigation";
 import { getUserById, getUserByNickname } from "../services/userService";
@@ -76,17 +76,7 @@ export default function ProfilePopupRoute() {
   }, [subscribeUserUpdates, nickname, replaceProfileNickname]);
 
   if (loading) {
-    return createPortal(
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 px-5 pb-8 pt-7 backdrop-blur-sm sm:px-6 sm:pb-9 sm:pt-8">
-        <div className="flex h-[min(33rem,calc(100dvh-5rem))] w-full max-w-5xl items-center justify-center rounded-[1.75rem] border border-white/15 bg-[#101018]/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:h-[min(36rem,calc(100dvh-4.75rem))]">
-          <div className="flex items-center gap-3 text-white">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
-            <span>Loading profile...</span>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
+    return <ProfilePopupLoadingShell />;
   }
 
   if (!profileUser) {

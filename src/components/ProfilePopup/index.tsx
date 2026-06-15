@@ -9,6 +9,7 @@ import ProfileCardView from "../ProfileCard/ProfileCardView";
 import { ProfilePopupProps } from "./types";
 import { useProfileEditing } from "./useProfileEditing";
 import { useProfileSocial } from "./useProfileSocial";
+import { profilePopupBackdropClass, profilePopupCardClass } from "./profilePopupLayout";
 
 const SWIPE_THRESHOLD_PX = 48;
 
@@ -110,11 +111,11 @@ export default function ProfilePopup({ onClose, user }: ProfilePopupProps) {
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 px-5 pb-8 pt-7 backdrop-blur-sm sm:px-6 sm:pb-9 sm:pt-8 lg:p-6"
+        className={profilePopupBackdropClass}
         onClick={editing.handleClose}
       >
       <div
-        className="relative flex h-[min(33rem,calc(100dvh-5rem))] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/15 bg-[#101018] shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:h-[min(36rem,calc(100dvh-4.75rem))] md:h-[min(820px,94vh,calc((100vw-3rem-18rem)*1.5))] md:w-fit md:max-w-[calc(100vw-1.5rem)] md:-translate-y-3 md:rounded-2xl md:bg-[#101018]/95 md:backdrop-blur-xl lg:max-h-[min(820px,94vh)]"
+        className={profilePopupCardClass}
         onClick={(event) => event.stopPropagation()}
       >
         <div
