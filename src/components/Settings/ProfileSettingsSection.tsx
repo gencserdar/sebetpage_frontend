@@ -30,15 +30,11 @@ function ProfileSettingsSectionInner({ user }: { user: UserDTO }) {
         description="Write your bio, link your accounts, and design your canvas."
       />
 
-      {(settings.error || settings.saving) && (
+      {settings.error && (
         <div className="mb-3" aria-live="polite">
-          {settings.error ? (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-              {settings.error}
-            </p>
-          ) : (
-            <p className="px-1 text-xs text-gray-500">Saving…</p>
-          )}
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {settings.error}
+          </p>
         </div>
       )}
 
