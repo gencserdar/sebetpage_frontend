@@ -123,26 +123,16 @@ class BlockService {
    * Check if current user has blocked a specific user
    */
   async isUserBlocked(nickname: string): Promise<boolean> {
-    try {
-      const status = await this.getBlockStatus(nickname);
-      return status.blockedByMe;
-    } catch (error) {
-      console.error('Error checking if user is blocked:', error);
-      return false;
-    }
+    const status = await this.getBlockStatus(nickname);
+    return status.blockedByMe;
   }
 
   /**
    * Check if current user is blocked by a specific user
    */
   async isBlockedByUser(nickname: string): Promise<boolean> {
-    try {
-      const status = await this.getBlockStatus(nickname);
-      return status.blocksMe;
-    } catch (error) {
-      console.error('Error checking if blocked by user:', error);
-      return false;
-    }
+    const status = await this.getBlockStatus(nickname);
+    return status.blocksMe;
   }
 
   /**

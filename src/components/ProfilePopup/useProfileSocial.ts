@@ -196,7 +196,9 @@ export function useProfileSocial({
   const handleAcceptRequest = async () => {
     if (!friendRequestId) return;
 
-    // Immediately update UI (optimistic update)
+    const previousStatus = friendStatus;
+    const previousRequestId = friendRequestId;
+
     setFriendStatus("friends");
     setFriendRequestId(null);
 
@@ -204,14 +206,21 @@ export function useProfileSocial({
       await respondToRequest(friendRequestId, true);
     } catch (err) {
       console.error("Failed to accept friend request:", err);
-      // Even if API fails, keep the UI updated for user feedback
+      setFriendStatus(previousStatus);
+      setFriendRequestId(previousRequestId);
+      setError((prev) => ({
+        ...prev,
+        general: "Failed to accept friend request. Please try again.",
+      }));
     }
   };
 
   const handleRejectRequest = async () => {
     if (!friendRequestId) return;
 
-    // Immediately update UI (optimistic update)
+    const previousStatus = friendStatus;
+    const previousRequestId = friendRequestId;
+
     setFriendStatus("none");
     setFriendRequestId(null);
 
@@ -219,7 +228,12 @@ export function useProfileSocial({
       await respondToRequest(friendRequestId, false);
     } catch (err) {
       console.error("Failed to reject friend request:", err);
-      // Even if API fails, keep the UI updated for user feedback
+      setFriendStatus(previousStatus);
+      setFriendRequestId(previousRequestId);
+      setError((prev) => ({
+        ...prev,
+        general: "Failed to reject friend request. Please try again.",
+      }));
     }
   };
 

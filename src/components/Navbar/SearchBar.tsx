@@ -8,6 +8,8 @@ import { SearchResponse, SearchResult } from "../../types/searchTypes";
 
 type SearchFilter = "users" | "communities";
 
+const MIN_SEARCH_LENGTH = 2;
+
 interface SearchBarProps {
   embedded?: boolean;
   onResultSelect?: () => void;
@@ -25,10 +27,12 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
   });
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("users");
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchRequestSeq = useRef(0);
   const [searchPlaceholder, setSearchPlaceholder] = useState("Search users and communities...");
 
   useEffect(() => {
@@ -59,14 +63,30 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
     async (query: string) => {
       if (!user) return;
 
+      const trimmed = query.trim();
+      if (trimmed.length < MIN_SEARCH_LENGTH) {
+        setSearchResults({ users: [], communities: [] });
+        setSearchFailed(false);
+        setSearchLoading(false);
+        return;
+      }
+
+      const seq = ++searchRequestSeq.current;
       setSearchLoading(true);
+      setSearchFailed(false);
       try {
-        const data = await searchUsersAndGroups(query);
+        const data = await searchUsersAndGroups(trimmed);
+        if (seq !== searchRequestSeq.current) return;
         setSearchResults(data);
       } catch (error) {
+        if (seq !== searchRequestSeq.current) return;
         console.error("Search failed:", error);
+        setSearchResults({ users: [], communities: [] });
+        setSearchFailed(true);
       } finally {
-        setSearchLoading(false);
+        if (seq === searchRequestSeq.current) {
+          setSearchLoading(false);
+        }
       }
     },
     [user]
@@ -76,9 +96,13 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
     if (!user) return;
 
     const timeoutId = setTimeout(() => {
-      if (searchQuery.trim().length >= 1) {
+      const trimmed = searchQuery.trim();
+      if (trimmed.length >= MIN_SEARCH_LENGTH) {
         void performSearch(searchQuery);
-      } else if (searchDropdownOpen && searchQuery.trim().length === 0) {
+      } else {
+        searchRequestSeq.current += 1;
+        setSearchLoading(false);
+        setSearchFailed(false);
         setSearchResults({ users: [], communities: [] });
       }
     }, 300);
@@ -128,6 +152,15 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
   };
 
   const renderSearchResults = () => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length > 0 && trimmed.length < MIN_SEARCH_LENGTH) {
+      return null;
+    }
+
+    if (searchFailed) {
+      return null;
+    }
+
     const filteredResults = getFilteredResults();
     const { users, communities } = filteredResults;
     const hasResults = users.length > 0 || communities.length > 0;
@@ -143,7 +176,7 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
       );
     }
 
-    if (!hasResults && searchQuery.trim().length >= 1) {
+    if (!hasResults && trimmed.length >= MIN_SEARCH_LENGTH) {
       return (
         <div className="p-4 text-center text-gray-400">
           No results found for &quot;{searchQuery}&quot;
@@ -151,7 +184,7 @@ export default function SearchBar({ embedded = false, onResultSelect }: SearchBa
       );
     }
 
-    if (searchQuery.trim().length === 0) {
+    if (trimmed.length === 0) {
       return (
         <div className="p-4 text-center text-sm text-gray-400">
           Start typing to search for users and communities

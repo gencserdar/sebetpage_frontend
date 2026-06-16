@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSocketContext } from "../../../context/ChatSocketContext";
 import { useProfileNavigation } from "../../../hooks/useProfileNavigation";
+import { blockService } from "../../../services/blockService";
 import { getFriends } from "../../../services/friendService";
 import { WsMessageDTO } from "../../../types/WSMessageDTO";
 import { UserDTO } from "../../../types/userDTO";
@@ -32,6 +33,8 @@ export function useFriendChat({
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRemoved, setIsRemoved] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [blocksMe, setBlocksMe] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [friendLastReadAt, setFriendLastReadAt] = useState<string | null>(null);
@@ -96,6 +99,23 @@ export function useFriendChat({
   const openFriendProfile = useCallback(() => {
     openProfile(friendNickname, friendUserId);
   }, [openProfile, friendNickname, friendUserId]);
+
+  const isBlocked = blockedByMe || blocksMe;
+  const blockHint = blockedByMe
+    ? "You blocked this user"
+    : blocksMe
+    ? "This user blocked you"
+    : null;
+
+  const refreshBlockStatus = useCallback(async () => {
+    try {
+      const status = await blockService.getBlockStatus(friendNickname);
+      setBlockedByMe(status.blockedByMe);
+      setBlocksMe(status.blocksMe);
+    } catch (e) {
+      console.warn("block status failed", e);
+    }
+  }, [friendNickname]);
 
   useEffect(() => {
     if (!showAddPanel) return;
@@ -165,6 +185,8 @@ export function useFriendChat({
         setConversationId(convId);
         setMyUserId(resolvedMyUserId);
 
+        void refreshBlockStatus();
+
         try {
           const rs = await getReadState(convId);
           if (mounted) setFriendLastReadAt(rs.friendLastReadAt || null);
@@ -200,6 +222,10 @@ export function useFriendChat({
 
         if (subscribeFriendEvents) {
           friendshipUnsub = subscribeFriendEvents((event: any) => {
+            if (event?.type === "BLOCK_STATUS_CHANGED" && Number(event.userId) === friendUserId) {
+              void refreshBlockStatus();
+              return;
+            }
             if (event?.type === "FRIEND_REMOVED" && event.removedFriend) {
               if (
                 event.removedFriend.email === friendEmail ||
@@ -239,6 +265,7 @@ export function useFriendChat({
     markRead,
     subscribeToConversation,
     subscribeFriendEvents,
+    refreshBlockStatus,
   ]);
 
   const loadOlder = useCallback(async () => {
@@ -349,7 +376,7 @@ export function useFriendChat({
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
-    if (!text || isRemoved || isSending || sendingRef.current || text === lastSentMessageRef.current) return;
+    if (!text || isRemoved || isBlocked || isSending || sendingRef.current || text === lastSentMessageRef.current) return;
     if (!conversationId || !myUserId) {
       console.warn("Chat not ready yet");
       return;
@@ -372,7 +399,7 @@ export function useFriendChat({
         lastSentMessageRef.current = "";
       }, 1000);
     }
-  }, [sendToConversation, conversationId, myUserId, isRemoved, inputValue, isSending]);
+  }, [sendToConversation, conversationId, myUserId, isRemoved, isBlocked, inputValue, isSending]);
 
   const seenMyMessageId = useMemo(() => {
     if (!friendLastReadAt || !myUserId) return null;
@@ -394,6 +421,10 @@ export function useFriendChat({
     myUserId,
     loading,
     isRemoved,
+    isBlocked,
+    blockedByMe,
+    blocksMe,
+    blockHint,
     isSending,
     inputValue,
     setInputValue,

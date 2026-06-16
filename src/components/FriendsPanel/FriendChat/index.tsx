@@ -37,6 +37,16 @@ export default function FriendChat({
     </div>
   );
 
+  const blockedBanner = !chat.isRemoved && chat.isBlocked && (
+    <div className="mb-3 p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-center">
+      <div className="text-amber-300 text-sm">
+        {chat.blockedByMe
+          ? "You blocked this user. Unblock them from their profile to message again."
+          : "This user has blocked you. You can't send messages."}
+      </div>
+    </div>
+  );
+
   const header = (
     <FriendChatHeader
       friendNickname={friendNickname}
@@ -80,6 +90,8 @@ export default function FriendChat({
       inputRef={chat.inputEl}
       inputValue={chat.inputValue}
       isRemoved={chat.isRemoved}
+      isBlocked={chat.isBlocked}
+      blockHint={chat.blockHint}
       isSending={chat.isSending}
       conversationId={chat.conversationId}
       onInputChange={chat.setInputValue}
@@ -126,6 +138,7 @@ export default function FriendChat({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-white/10 bg-app-surface/95 p-3 backdrop-blur-xl sm:p-4 lg:h-auto lg:w-1/2 lg:border-l lg:border-t-0">
           {header}
           {removedBanner}
+          {blockedBanner}
           {messages}
           {input}
         </div>
@@ -140,6 +153,7 @@ export default function FriendChat({
     >
       {header}
       {removedBanner}
+      {blockedBanner}
       {messages}
       {input}
     </div>
