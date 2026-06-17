@@ -35,3 +35,14 @@ export function dayLabel(d: Date) {
     ...(sameYear ? {} : { year: "numeric" }),
   });
 }
+
+export function getMessageCreatedAtMillis(message: { createdAt: string; createdAtMillis?: number }) {
+  if (typeof message.createdAtMillis === "number" && Number.isFinite(message.createdAtMillis)) {
+    return message.createdAtMillis;
+  }
+  const parsed = new Date(message.createdAt).getTime();
+  if (!Number.isFinite(parsed)) {
+    throw new Error("Message is missing a valid createdAt timestamp");
+  }
+  return parsed;
+}

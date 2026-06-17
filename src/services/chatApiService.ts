@@ -4,6 +4,7 @@
 // the 401-refresh-retry behavior instead of hand-rolling a Bearer header.
 
 import { api } from "./apiService";
+import { WsMessageDTO } from "../types/WSMessageDTO";
 
 function parseApiError(raw: string, fallback: string): string {
   const trimmed = raw.trim();
@@ -200,6 +201,42 @@ class ChatApiService {
       const err = await res.text();
       throw new Error(err || "Failed to delete group");
     }
+  }
+
+  async deleteMessage(
+    conversationId: number,
+    messageId: number,
+    createdAtMillis: number
+  ): Promise<void> {
+    const res = await api(
+      `${this.baseUrl}/conversations/${conversationId}/messages/${messageId}?createdAtMillis=${createdAtMillis}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(parseApiError(err, "Failed to delete message"));
+    }
+  }
+
+  async editMessage(
+    conversationId: number,
+    messageId: number,
+    createdAtMillis: number,
+    content: string
+  ): Promise<WsMessageDTO> {
+    const res = await api(
+      `${this.baseUrl}/conversations/${conversationId}/messages/${messageId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, createdAtMillis }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(parseApiError(err, "Failed to edit message"));
+    }
+    return res.json() as Promise<WsMessageDTO>;
   }
 }
 

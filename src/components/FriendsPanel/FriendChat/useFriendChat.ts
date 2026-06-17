@@ -2,10 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useChatSocketContext } from "../../../context/ChatSocketContext";
 import { useProfileNavigation } from "../../../hooks/useProfileNavigation";
 import { blockService } from "../../../services/blockService";
+import { chatApiService } from "../../../services/chatApiService";
 import { getFriends } from "../../../services/friendService";
 import { WsMessageDTO } from "../../../types/WSMessageDTO";
 import { UserDTO } from "../../../types/userDTO";
-import { PAGE_SIZE, dayLabel } from "./chatUtils";
+import { PAGE_SIZE, dayLabel, getMessageCreatedAtMillis } from "./chatUtils";
 import { FriendChatProps, RenderItem } from "./types";
 
 type UseFriendChatParams = Pick<
@@ -47,10 +48,19 @@ export function useFriendChat({
   const [friendsList, setFriendsList] = useState<UserDTO[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [messageActionPending, setMessageActionPending] = useState(false);
+  const [pendingDeleteMessage, setPendingDeleteMessage] = useState<WsMessageDTO | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const inputEl = useRef<HTMLInputElement>(null);
   const sendingRef = useRef(false);
   const lastSentMessageRef = useRef("");
+  const lastTypingSentRef = useRef(0);
+  const typingClearTimerRef = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const messageEdgesRef = useRef<{ firstKey: string | null; lastKey: string | null }>({
     firstKey: null,
@@ -68,6 +78,9 @@ export function useFriendChat({
     subscribeFriendEvents,
     getReadState,
     markRead,
+    subscribeUnreadEvents,
+    getConversationUnread,
+    sendTyping,
   } = useChatSocketContext();
 
   const { openProfile } = useProfileNavigation();
@@ -159,6 +172,78 @@ export function useFriendChat({
   }, [friendsList, addSearch]);
 
   useEffect(() => {
+    if (!conversationId) {
+      setUnreadCount(0);
+      return;
+    }
+    setUnreadCount(getConversationUnread(conversationId));
+    const unsub = subscribeUnreadEvents((evt) => {
+      if (evt.conversationId === conversationId) {
+        setUnreadCount(evt.unreadCount ?? 0);
+      }
+    });
+    return unsub;
+  }, [conversationId, subscribeUnreadEvents, getConversationUnread]);
+
+  useEffect(() => {
+    return () => {
+      if (typingClearTimerRef.current !== null) {
+        window.clearTimeout(typingClearTimerRef.current);
+      }
+    };
+  }, []);
+
+  const applyConversationEvent = useCallback((raw: any, convId: number, resolvedMyUserId: number) => {
+    if (raw?.type === "READ") {
+      if (Number(raw.readerUserId) === Number(friendUserId)) {
+        setFriendLastReadAt(raw.lastReadAt || null);
+      }
+      return;
+    }
+    if (raw?.type === "TYPING") {
+      if (Number(raw.userId) !== Number(resolvedMyUserId)) {
+        setTypingLabel("typing...");
+        if (typingClearTimerRef.current !== null) {
+          window.clearTimeout(typingClearTimerRef.current);
+        }
+        typingClearTimerRef.current = window.setTimeout(() => setTypingLabel(null), 3000);
+      }
+      return;
+    }
+    if (raw?.type === "MESSAGE_DELETED") {
+      const messageId = Number(raw.messageId ?? raw.message?.id);
+      if (!messageId) return;
+      setMessages((prev) =>
+        prev.map((x) =>
+          x.id === messageId ? { ...x, deleted: true, content: "" } : x
+        )
+      );
+      return;
+    }
+    if (raw?.type === "MESSAGE_EDITED") {
+      const updated = (raw.message ?? raw) as WsMessageDTO;
+      if (!updated?.id) return;
+      setMessages((prev) =>
+        prev.map((x) =>
+          x.id === updated.id
+            ? {
+                ...x,
+                content: updated.content ?? x.content,
+                editedAt: updated.editedAt ?? new Date().toISOString(),
+              }
+            : x
+        )
+      );
+      return;
+    }
+    const m = raw as WsMessageDTO;
+    setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+    if (Number(m.senderId) !== Number(resolvedMyUserId)) {
+      markRead(convId).catch(() => {});
+    }
+  }, [friendUserId, markRead]);
+
+  useEffect(() => {
     const h = () => {
       if (conversationId) markRead(conversationId);
     };
@@ -207,17 +292,7 @@ export function useFriendChat({
         }
 
         unsub = subscribeToConversation(convId, (raw: any) => {
-          if (raw && raw.type === "READ") {
-            if (Number(raw.readerUserId) === Number(friendUserId)) {
-              setFriendLastReadAt(raw.lastReadAt || null);
-            }
-            return;
-          }
-          const m = raw as WsMessageDTO;
-          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          if (Number(m.senderId) !== Number(resolvedMyUserId)) {
-            markRead(convId).catch(() => {});
-          }
+          applyConversationEvent(raw, convId, resolvedMyUserId);
         });
 
         if (subscribeFriendEvents) {
@@ -266,6 +341,7 @@ export function useFriendChat({
     subscribeToConversation,
     subscribeFriendEvents,
     refreshBlockStatus,
+    applyConversationEvent,
   ]);
 
   const loadOlder = useCallback(async () => {
@@ -401,6 +477,121 @@ export function useFriendChat({
     }
   }, [sendToConversation, conversationId, myUserId, isRemoved, isBlocked, inputValue, isSending]);
 
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setInputValue(value);
+      if (!conversationId || isRemoved || isBlocked) return;
+      const now = Date.now();
+      if (now - lastTypingSentRef.current < 2000) return;
+      lastTypingSentRef.current = now;
+      sendTyping(conversationId);
+    },
+    [conversationId, isRemoved, isBlocked, sendTyping]
+  );
+
+  const messageCreatedAtMillis = useCallback((message: WsMessageDTO) => {
+    return getMessageCreatedAtMillis(message);
+  }, []);
+
+  const handleStartEdit = useCallback((message: WsMessageDTO) => {
+    setActionError(null);
+    setEditingMessageId(message.id);
+    setEditDraft(message.content);
+  }, []);
+
+  const handleEditCancel = useCallback(() => {
+    setEditingMessageId(null);
+    setEditDraft("");
+  }, []);
+
+  const handleEditSave = useCallback(async () => {
+    if (!conversationId || editingMessageId === null) return;
+    const text = editDraft.trim();
+    if (!text) return;
+    const target = messages.find((m) => m.id === editingMessageId);
+    if (!target) return;
+
+    setMessageActionPending(true);
+    setActionError(null);
+    try {
+      const updated = await chatApiService.editMessage(
+        conversationId,
+        editingMessageId,
+        messageCreatedAtMillis(target),
+        text
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === editingMessageId
+            ? {
+                ...m,
+                content: updated.content ?? text,
+                editedAt: updated.editedAt ?? new Date().toISOString(),
+                createdAtMillis: updated.createdAtMillis ?? m.createdAtMillis,
+              }
+            : m
+        )
+      );
+      setEditingMessageId(null);
+      setEditDraft("");
+    } catch (e) {
+      console.error("Failed to edit message:", e);
+      setActionError(e instanceof Error ? e.message : "Failed to edit message");
+    } finally {
+      setMessageActionPending(false);
+    }
+  }, [
+    conversationId,
+    editDraft,
+    editingMessageId,
+    messageCreatedAtMillis,
+    messages,
+  ]);
+
+  const handleDeleteMessage = useCallback((message: WsMessageDTO) => {
+    setActionError(null);
+    setPendingDeleteMessage(message);
+  }, []);
+
+  const handleCancelDelete = useCallback(() => {
+    if (messageActionPending) return;
+    setPendingDeleteMessage(null);
+  }, [messageActionPending]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!conversationId || !pendingDeleteMessage) return;
+
+    setMessageActionPending(true);
+    setActionError(null);
+    try {
+      await chatApiService.deleteMessage(
+        conversationId,
+        pendingDeleteMessage.id,
+        messageCreatedAtMillis(pendingDeleteMessage)
+      );
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingDeleteMessage.id ? { ...m, deleted: true, content: "" } : m
+        )
+      );
+      if (editingMessageId === pendingDeleteMessage.id) {
+        handleEditCancel();
+      }
+      setPendingDeleteMessage(null);
+    } catch (e) {
+      console.error("Failed to delete message:", e);
+      setActionError(e instanceof Error ? e.message : "Failed to delete message");
+    } finally {
+      setMessageActionPending(false);
+    }
+  }, [
+    conversationId,
+    editingMessageId,
+    handleEditCancel,
+    messageCreatedAtMillis,
+    pendingDeleteMessage,
+  ]);
+
   const seenMyMessageId = useMemo(() => {
     if (!friendLastReadAt || !myUserId) return null;
     const t = new Date(friendLastReadAt).getTime();
@@ -428,6 +619,7 @@ export function useFriendChat({
     isSending,
     inputValue,
     setInputValue,
+    handleInputChange,
     isExpanded,
     setIsExpanded,
     showAddPanel,
@@ -448,5 +640,20 @@ export function useFriendChat({
     handleToggleAdd,
     handleSend,
     seenMyMessageId,
+    unreadCount,
+    typingLabel,
+    editingMessageId,
+    editDraft,
+    setEditDraft,
+    handleStartEdit,
+    handleEditSave,
+    handleEditCancel,
+    handleDeleteMessage,
+    messageActionPending,
+    pendingDeleteMessage,
+    handleCancelDelete,
+    handleConfirmDelete,
+    actionError,
+    setActionError,
   };
 }

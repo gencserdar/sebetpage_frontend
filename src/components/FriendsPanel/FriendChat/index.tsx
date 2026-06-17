@@ -2,6 +2,7 @@ import { Newspaper } from "lucide-react";
 import FriendChatHeader from "./FriendChatHeader";
 import FriendChatInput from "./FriendChatInput";
 import FriendChatMessageList from "./FriendChatMessageList";
+import ChatDeleteConfirm from "./ChatDeleteConfirm";
 import { BellIcon, ChevronIcon, SearchIcon } from "./icons";
 import { FriendChatProps } from "./types";
 import { useFriendChat } from "./useFriendChat";
@@ -13,7 +14,6 @@ export default function FriendChat({
   friendNickname,
   onClose,
   onRemoved,
-  unreadCount = 0,
   expandedRail,
   initialExpanded = false,
   onExpandedChange,
@@ -51,7 +51,8 @@ export default function FriendChat({
     <FriendChatHeader
       friendNickname={friendNickname}
       friendUserId={friendUserId}
-      unreadCount={unreadCount}
+      unreadCount={chat.unreadCount}
+      typingLabel={chat.typingLabel}
       isRemoved={chat.isRemoved}
       isExpanded={chat.isExpanded}
       showAddPanel={chat.showAddPanel}
@@ -74,16 +75,46 @@ export default function FriendChat({
   );
 
   const messages = (
-    <FriendChatMessageList
-      listRef={chat.listRef}
-      expanded={chat.isExpanded}
-      loading={chat.loading}
-      loadingOlder={chat.loadingOlder}
-      renderItems={chat.renderItems}
-      myUserId={chat.myUserId}
-      seenMyMessageId={chat.seenMyMessageId}
-    />
+    <div className="relative min-h-0 flex-1">
+      <FriendChatMessageList
+        listRef={chat.listRef}
+        expanded={chat.isExpanded}
+        loading={chat.loading}
+        loadingOlder={chat.loadingOlder}
+        renderItems={chat.renderItems}
+        myUserId={chat.myUserId}
+        seenMyMessageId={chat.seenMyMessageId}
+        editingMessageId={chat.editingMessageId}
+        editDraft={chat.editDraft}
+        onEditDraftChange={chat.setEditDraft}
+        onEditSave={chat.handleEditSave}
+        onEditCancel={chat.handleEditCancel}
+        onStartEdit={chat.handleStartEdit}
+        onDelete={chat.handleDeleteMessage}
+        actionPending={chat.messageActionPending}
+      />
+      {chat.pendingDeleteMessage && (
+        <ChatDeleteConfirm
+          pending={chat.messageActionPending}
+          onCancel={chat.handleCancelDelete}
+          onConfirm={chat.handleConfirmDelete}
+        />
+      )}
+    </div>
   );
+
+  const actionErrorBanner = chat.actionError ? (
+    <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+      <span>{chat.actionError}</span>
+      <button
+        type="button"
+        onClick={() => chat.setActionError(null)}
+        className="shrink-0 text-red-300 hover:text-white"
+      >
+        Dismiss
+      </button>
+    </div>
+  ) : null;
 
   const input = (
     <FriendChatInput
@@ -94,8 +125,9 @@ export default function FriendChat({
       blockHint={chat.blockHint}
       isSending={chat.isSending}
       conversationId={chat.conversationId}
-      onInputChange={chat.setInputValue}
+      onInputChange={chat.handleInputChange}
       onSend={chat.handleSend}
+      typingLabel={chat.typingLabel}
     />
   );
 
@@ -139,6 +171,7 @@ export default function FriendChat({
           {header}
           {removedBanner}
           {blockedBanner}
+          {actionErrorBanner}
           {messages}
           {input}
         </div>
@@ -154,6 +187,7 @@ export default function FriendChat({
       {header}
       {removedBanner}
       {blockedBanner}
+      {actionErrorBanner}
       {messages}
       {input}
     </div>

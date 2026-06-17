@@ -50,6 +50,20 @@ export function isLoggedIn(): boolean {
   return !!accessToken;
 }
 
+/** Session id ("sid") embedded in the access JWT — used to match remote revocations. */
+export function getSessionIdFromToken(): number | null {
+  if (!accessToken) return null;
+  try {
+    const payload = JSON.parse(atob(accessToken.split(".")[1])) as { sid?: unknown };
+    const sid = payload.sid;
+    return typeof sid === "number" && Number.isFinite(sid) ? sid : null;
+  } catch {
+    return null;
+  }
+}
+
+export const AUTH_SESSION_REVOKED_EVENT = "auth:session-revoked";
+
 export async function logout() {
   try {
     // Clear the in-memory token first so concurrent requests stop

@@ -6,12 +6,18 @@ import SettingsSidebar from "../components/Settings/SettingsSidebar";
 import ProfileSettingsSection from "../components/Settings/ProfileSettingsSection";
 import AccountSettingsSection from "../components/Settings/AccountSettingsSection";
 import BlockedUsersSection from "../components/Settings/BlockedUsersSection";
+import SessionsSection from "../components/Settings/SessionsSection";
 import { SettingsSection } from "../components/Settings/types";
 import { useUser } from "../context/UserContext";
 import { appPageClass, appSurfaceCardClass } from "../theme/appTheme";
 
 function isSettingsSection(value: unknown): value is SettingsSection {
-  return value === "profile" || value === "account" || value === "blocked";
+  return (
+    value === "profile" ||
+    value === "account" ||
+    value === "blocked" ||
+    value === "sessions"
+  );
 }
 
 export default function SettingsPage() {
@@ -58,6 +64,7 @@ export default function SettingsPage() {
           <main className="indigo-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-black/30 p-4 sm:p-6 lg:p-10 [scrollbar-gutter:stable]">
             {section === "profile" && <ProfileSettingsSection />}
             {section === "account" && <AccountSettingsSection />}
+            {section === "sessions" && <SessionsSection />}
             {section === "blocked" && <BlockedUsersSection />}
           </main>
         </div>

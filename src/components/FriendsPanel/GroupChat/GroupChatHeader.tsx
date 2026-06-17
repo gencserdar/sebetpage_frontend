@@ -14,6 +14,7 @@ interface GroupChatHeaderProps {
   displayName: string;
   detail: MessagingGroupDetail | null;
   initialParticipants: GroupParticipant[];
+  typingLabel?: string | null;
   canAddMembers: boolean;
   showAddPanel: boolean;
   addSearch: string;
@@ -35,6 +36,7 @@ export default function GroupChatHeader({
   displayName,
   detail,
   initialParticipants,
+  typingLabel,
   canAddMembers,
   showAddPanel,
   addSearch,
@@ -63,11 +65,12 @@ export default function GroupChatHeader({
           {displayName}
         </button>
         <div className="truncate text-xs text-gray-500">
-          {detail?.participants?.length
-            ? `${detail.participants.length} members`
-            : initialParticipants.length > 0
-              ? initialParticipants.map((p) => p.nickname).join(", ")
-              : "Group chat"}
+          {typingLabel ||
+            (detail?.participants?.length
+              ? `${detail.participants.length} members`
+              : initialParticipants.length > 0
+                ? initialParticipants.map((p) => p.nickname).join(", ")
+                : "Group chat")}
         </div>
       </div>
 

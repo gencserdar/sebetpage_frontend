@@ -1,7 +1,8 @@
+import { useState } from "react";
 import ChatBubble from "./ChatBubble";
 import DaySeparator from "./DaySeparator";
 import { RenderItem } from "./types";
-import { useState } from "react";
+import { WsMessageDTO } from "../../../types/WSMessageDTO";
 interface FriendChatMessageListProps {
   listRef: React.RefObject<HTMLDivElement | null>;
   expanded: boolean;
@@ -10,6 +11,14 @@ interface FriendChatMessageListProps {
   renderItems: RenderItem[];
   myUserId: number | null;
   seenMyMessageId: number | null;
+  editingMessageId?: number | null;
+  editDraft?: string;
+  onEditDraftChange?: (value: string) => void;
+  onEditSave?: () => void;
+  onEditCancel?: () => void;
+  onStartEdit?: (message: WsMessageDTO) => void;
+  onDelete?: (message: WsMessageDTO) => void;
+  actionPending?: boolean;
 }
 
 export default function FriendChatMessageList({
@@ -20,6 +29,14 @@ export default function FriendChatMessageList({
   renderItems,
   myUserId,
   seenMyMessageId,
+  editingMessageId,
+  editDraft,
+  onEditDraftChange,
+  onEditSave,
+  onEditCancel,
+  onStartEdit,
+  onDelete,
+  actionPending,
 }: FriendChatMessageListProps) {
   const [timeVisibleMessageId, setTimeVisibleMessageId] = useState<number | null>(null);
 
@@ -52,6 +69,14 @@ export default function FriendChatMessageList({
           seenMyMessageId={seenMyMessageId}
           showTime={timeVisibleMessageId === it.data.id}
           onToggleTime={() => toggleTimeFor(it.data.id)}
+          editingMessageId={editingMessageId}
+          editDraft={editDraft}
+          onEditDraftChange={onEditDraftChange}
+          onEditSave={onEditSave}
+          onEditCancel={onEditCancel}
+          onStartEdit={onStartEdit}
+          onDelete={onDelete}
+          actionPending={actionPending}
         />
       );
     }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { api } from "../services/apiService";
+import { getSessionIdFromToken, AUTH_SESSION_REVOKED_EVENT } from "../services/authService";
 import { WsMessageDTO } from "../types/WSMessageDTO";
 import type { Page } from "../types/page";
 
@@ -250,6 +251,14 @@ export function useChatSocket(principalEmail: string) {
                     try { cb(u); } catch (e) { console.error("user-update callback error:", e); }
                   });
                 }
+                else if (event?.type === "SESSION_REVOKED" && event?.sessionId != null) {
+                  const revokedId = Number(event.sessionId);
+                  const mySid = getSessionIdFromToken();
+                  if (mySid != null && mySid === revokedId) {
+                    tearDownSocket();
+                    window.dispatchEvent(new CustomEvent(AUTH_SESSION_REVOKED_EVENT));
+                  }
+                }
 
                 friendCallbacks.forEach((callback) => callback(event));
               } catch (error) {
@@ -448,7 +457,17 @@ export function useChatSocket(principalEmail: string) {
       });
     },
     []
-  ); 
+  );
+
+  /** Notify others that the user is typing in a conversation */
+  const sendTyping = useCallback((conversationId: number) => {
+    const client = sharedClient;
+    if (!client?.connected) return;
+    client.publish({
+      destination: "/app/chat/typing",
+      body: JSON.stringify({ conversationId }),
+    });
+  }, []);
 
   /** Get latest messages in ascending order (for initial load) */
   const getLatestMessagesAsc = useCallback(
@@ -601,6 +620,7 @@ export function useChatSocket(principalEmail: string) {
     subscribeToConversation,
     resolveDirectConversation,
     sendToConversation,
+    sendTyping,
 
     // Message history
     getLatestMessagesAsc,

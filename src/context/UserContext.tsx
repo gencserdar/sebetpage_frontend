@@ -7,6 +7,7 @@ import {
   isLoggedIn,
   forgotPassword as forgotPasswordService,
   setAccessToken,
+  AUTH_SESSION_REVOKED_EVENT,
 } from "../services/authService";
 import { UserDTO } from "../types/userDTO";
 import { tearDownChatSocket } from "../hooks/useWebSocket";
@@ -100,6 +101,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshUser().finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const onRevoked = () => { void logout(); };
+    window.addEventListener(AUTH_SESSION_REVOKED_EVENT, onRevoked);
+    return () => window.removeEventListener(AUTH_SESSION_REVOKED_EVENT, onRevoked);
   }, []);
 
   return (

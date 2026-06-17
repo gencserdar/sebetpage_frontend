@@ -11,6 +11,14 @@ interface GroupChatMessageListProps {
   messages: WsMessageDTO[];
   myUserId: number;
   nickOf: (userId: number) => string;
+  editingMessageId?: number | null;
+  editDraft?: string;
+  onEditDraftChange?: (value: string) => void;
+  onEditSave?: () => void;
+  onEditCancel?: () => void;
+  onStartEdit?: (message: WsMessageDTO) => void;
+  onDelete?: (message: WsMessageDTO) => void;
+  actionPending?: boolean;
 }
 
 export default function GroupChatMessageList({
@@ -22,6 +30,14 @@ export default function GroupChatMessageList({
   messages,
   myUserId,
   nickOf,
+  editingMessageId,
+  editDraft,
+  onEditDraftChange,
+  onEditSave,
+  onEditCancel,
+  onStartEdit,
+  onDelete,
+  actionPending,
 }: GroupChatMessageListProps) {
   const groups: React.ReactElement[] = [];
   let curLabel: string | null = null;
@@ -52,6 +68,14 @@ export default function GroupChatMessageList({
           messages={messages}
           myUserId={myUserId}
           nickOf={nickOf}
+          editingMessageId={editingMessageId}
+          editDraft={editDraft}
+          onEditDraftChange={onEditDraftChange}
+          onEditSave={onEditSave}
+          onEditCancel={onEditCancel}
+          onStartEdit={onStartEdit}
+          onDelete={onDelete}
+          actionPending={actionPending}
         />
       );
     }

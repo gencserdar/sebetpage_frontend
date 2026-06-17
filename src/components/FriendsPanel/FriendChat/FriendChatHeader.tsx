@@ -7,6 +7,7 @@ interface FriendChatHeaderProps {
   friendNickname: string;
   friendUserId: number;
   unreadCount: number;
+  typingLabel?: string | null;
   isRemoved: boolean;
   isExpanded: boolean;
   showAddPanel: boolean;
@@ -39,6 +40,7 @@ export default function FriendChatHeader({
   friendNickname,
   friendUserId,
   unreadCount,
+  typingLabel,
   isRemoved,
   isExpanded,
   showAddPanel,
@@ -71,6 +73,9 @@ export default function FriendChatHeader({
           {friendNickname}
         </button>
         <UnreadDot show={unreadCount > 0} />
+        {typingLabel && (
+          <span className="truncate text-xs italic text-indigo-300/80">{typingLabel}</span>
+        )}
         {isRemoved && (
           <span className="text-xs text-red-400 bg-red-500/20 px-2 py-1 rounded-full border border-red-500/30 whitespace-nowrap">
             Removed
