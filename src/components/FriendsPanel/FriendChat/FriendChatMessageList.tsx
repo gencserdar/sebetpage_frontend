@@ -5,13 +5,12 @@ import { RenderItem } from "./types";
 import { WsMessageDTO } from "../../../types/WSMessageDTO";
 interface FriendChatMessageListProps {
   listRef: React.RefObject<HTMLDivElement | null>;
-  expanded: boolean;
   loading: boolean;
   loadingOlder: boolean;
   renderItems: RenderItem[];
   myUserId: number | null;
-  seenMyMessageId: number | null;
-  editingMessageId?: number | null;
+  seenMyMessageId: string | null;
+  editingMessageId?: string | null;
   editDraft?: string;
   onEditDraftChange?: (value: string) => void;
   onEditSave?: () => void;
@@ -23,7 +22,6 @@ interface FriendChatMessageListProps {
 
 export default function FriendChatMessageList({
   listRef,
-  expanded,
   loading,
   loadingOlder,
   renderItems,
@@ -38,9 +36,9 @@ export default function FriendChatMessageList({
   onDelete,
   actionPending,
 }: FriendChatMessageListProps) {
-  const [timeVisibleMessageId, setTimeVisibleMessageId] = useState<number | null>(null);
+  const [timeVisibleMessageId, setTimeVisibleMessageId] = useState<string | null>(null);
 
-  const toggleTimeFor = (messageId: number) => {
+  const toggleTimeFor = (messageId: string) => {
     setTimeVisibleMessageId((prev) => (prev === messageId ? null : messageId));
   };
 
@@ -94,9 +92,7 @@ export default function FriendChatMessageList({
   return (
     <div
       ref={listRef}
-      className={`mb-3 overflow-y-auto rounded-xl bg-gradient-to-b from-app-surface/40 to-app-bg/80 p-3 ${
-        expanded ? "min-h-0 flex-1" : "h-80 max-md:min-h-0 max-md:flex-1"
-      }`}
+      className="mb-3 min-h-0 flex-1 overflow-y-auto rounded-xl bg-gradient-to-b from-app-surface/40 to-app-bg/80 p-3"
       style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.5) rgba(0,0,0,.4)" }}
     >
       {loadingOlder && (

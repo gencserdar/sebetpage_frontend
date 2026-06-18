@@ -6,10 +6,10 @@ import { fmtTime } from "./chatUtils";
 interface ChatBubbleProps {
   message: WsMessageDTO;
   myUserId: number | null;
-  seenMyMessageId: number | null;
+  seenMyMessageId: string | null;
   showTime: boolean;
   onToggleTime: () => void;
-  editingMessageId?: number | null;
+  editingMessageId?: string | null;
   editDraft?: string;
   onEditDraftChange?: (value: string) => void;
   onEditSave?: () => void;
@@ -168,23 +168,15 @@ export default function ChatBubble({
           </div>
         )}
 
-        {!isEditing && (
+        {!isEditing && (m.editedAt || showTime) && (
           <div
-            className={`grid w-full transition-[grid-template-rows] duration-200 ease-out ${
-              showTime ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-            } ${mine ? "justify-items-end" : "justify-items-start"}`}
-            style={{ maxWidth: "90%" }}
+            className={`mt-0.5 max-w-[90%] text-[11px] text-gray-500 ${
+              mine ? "text-right" : "text-left"
+            }`}
           >
-            <div className="overflow-hidden">
-              <div
-                className={`pt-1 text-[11px] text-gray-500 transition-opacity duration-200 ease-out ${
-                  showTime ? "opacity-100" : "opacity-0"
-                } ${mine ? "text-right" : "text-left"}`}
-              >
-                {fmtTime(m.createdAt)}
-                {m.editedAt ? " · edited" : ""}
-              </div>
-            </div>
+            {m.editedAt && <span className="italic">(edited)</span>}
+            {m.editedAt && showTime && <span aria-hidden="true"> · </span>}
+            {showTime && <span>{fmtTime(m.createdAt)}</span>}
           </div>
         )}
         {mine && seenMyMessageId === m.id && !isEditing && (

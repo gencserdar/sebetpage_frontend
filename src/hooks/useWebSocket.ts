@@ -4,6 +4,7 @@ import SockJS from "sockjs-client";
 import { api } from "../services/apiService";
 import { getSessionIdFromToken, AUTH_SESSION_REVOKED_EVENT } from "../services/authService";
 import { WsMessageDTO } from "../types/WSMessageDTO";
+import { normalizeWsMessage } from "../components/FriendsPanel/FriendChat/chatUtils";
 import type { Page } from "../types/page";
 
 type ResolveResp = {
@@ -28,7 +29,7 @@ type WsTicketResponse = {
 export type ReadState = {
   myLastReadAt: string | null;
   friendLastReadAt: string | null;
-  seenMyMessageId: number | null;
+  seenMyMessageId: string | null;
   myUserId: number;
   friendUserId: number;
 };
@@ -481,7 +482,8 @@ export function useChatSocket(principalEmail: string) {
         throw new Error(`Failed to get latest messages: ${response.status} ${errorText}`);
       }
       
-      return response.json() as Promise<WsMessageDTO[]>;
+      const data = await response.json();
+      return (Array.isArray(data) ? data : []).map(normalizeWsMessage);
     }, 
     []
   );
@@ -498,7 +500,13 @@ export function useChatSocket(principalEmail: string) {
         throw new Error(`Failed to get paged messages: ${response.status} ${errorText}`);
       }
       
-      return response.json() as Promise<Page<WsMessageDTO>>;
+      const data = await response.json();
+      return {
+        ...data,
+        content: Array.isArray(data.content)
+          ? data.content.map(normalizeWsMessage)
+          : [],
+      } as Page<WsMessageDTO>;
     },
     []
   );
@@ -513,7 +521,27 @@ export function useChatSocket(principalEmail: string) {
         throw new Error(`Failed to get read state: ${response.status} ${errorText}`);
       }
       
-      return response.json() as Promise<ReadState>;
+      const raw = await response.json();
+      const friendLastReadAt =
+        raw.friendLastReadAt ??
+        (raw.friendLastReadAtMillis != null
+          ? new Date(Number(raw.friendLastReadAtMillis)).toISOString()
+          : null);
+      const myLastReadAt =
+        raw.myLastReadAt ??
+        (raw.myLastReadAtMillis != null
+          ? new Date(Number(raw.myLastReadAtMillis)).toISOString()
+          : null);
+      return {
+        myLastReadAt,
+        friendLastReadAt,
+        seenMyMessageId:
+          raw.seenMyMessageId != null && raw.seenMyMessageId !== ""
+            ? String(raw.seenMyMessageId)
+            : null,
+        myUserId: Number(raw.myUserId),
+        friendUserId: Number(raw.friendUserId),
+      };
     }, 
     []
   );

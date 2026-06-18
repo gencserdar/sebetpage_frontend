@@ -6,7 +6,7 @@ import { chatApiService } from "../../../services/chatApiService";
 import { getFriends } from "../../../services/friendService";
 import { WsMessageDTO } from "../../../types/WSMessageDTO";
 import { UserDTO } from "../../../types/userDTO";
-import { PAGE_SIZE, dayLabel, getMessageCreatedAtMillis } from "./chatUtils";
+import { PAGE_SIZE, dayLabel, getMessageCreatedAtMillis, getMutationMessageId, normalizeWsMessage } from "./chatUtils";
 import { FriendChatProps, RenderItem } from "./types";
 
 type UseFriendChatParams = Pick<
@@ -50,7 +50,7 @@ export function useFriendChat({
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [typingLabel, setTypingLabel] = useState<string | null>(null);
-  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [messageActionPending, setMessageActionPending] = useState(false);
   const [pendingDeleteMessage, setPendingDeleteMessage] = useState<WsMessageDTO | null>(null);
@@ -211,7 +211,7 @@ export function useFriendChat({
       return;
     }
     if (raw?.type === "MESSAGE_DELETED") {
-      const messageId = Number(raw.messageId ?? raw.message?.id);
+      const messageId = getMutationMessageId(raw);
       if (!messageId) return;
       setMessages((prev) =>
         prev.map((x) =>
@@ -221,8 +221,8 @@ export function useFriendChat({
       return;
     }
     if (raw?.type === "MESSAGE_EDITED") {
-      const updated = (raw.message ?? raw) as WsMessageDTO;
-      if (!updated?.id) return;
+      const updated = normalizeWsMessage(raw.message ?? raw);
+      if (!updated.id) return;
       setMessages((prev) =>
         prev.map((x) =>
           x.id === updated.id
@@ -230,13 +230,15 @@ export function useFriendChat({
                 ...x,
                 content: updated.content ?? x.content,
                 editedAt: updated.editedAt ?? new Date().toISOString(),
+                createdAtMillis: updated.createdAtMillis ?? x.createdAtMillis,
+                deleted: false,
               }
             : x
         )
       );
       return;
     }
-    const m = raw as WsMessageDTO;
+    const m = normalizeWsMessage(raw);
     setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
     if (Number(m.senderId) !== Number(resolvedMyUserId)) {
       markRead(convId).catch(() => {});
@@ -593,17 +595,22 @@ export function useFriendChat({
   ]);
 
   const seenMyMessageId = useMemo(() => {
-    if (!friendLastReadAt || !myUserId) return null;
-    const t = new Date(friendLastReadAt).getTime();
-    let id: number | null = null;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (m.senderId === myUserId && new Date(m.createdAt).getTime() <= t) {
-        id = m.id;
-        break;
-      }
-    }
-    return id;
+    if (!friendLastReadAt || !myUserId || !messages.length) return null;
+
+    const visible = messages.filter((m) => !m.deleted && Number(m.senderId) !== 0);
+    if (!visible.length) return null;
+
+    const lastMsg = visible[visible.length - 1];
+    // Only show "Seen" when my message is still the latest in the thread.
+    if (lastMsg.senderId !== myUserId) return null;
+
+    const readAt = new Date(friendLastReadAt).getTime();
+    if (!Number.isFinite(readAt)) return null;
+
+    const lastMsgTime = new Date(lastMsg.createdAt).getTime();
+    if (!Number.isFinite(lastMsgTime) || lastMsgTime > readAt) return null;
+
+    return lastMsg.id;
   }, [friendLastReadAt, myUserId, messages]);
 
   return {

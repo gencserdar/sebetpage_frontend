@@ -7,7 +7,7 @@ import {
   chatApiService,
   MessagingGroupDetail,
 } from "../../../services/chatApiService";
-import { PAGE_SIZE, dayLabel, getMessageCreatedAtMillis } from "../FriendChat/chatUtils";
+import { PAGE_SIZE, dayLabel, getMessageCreatedAtMillis, getMutationMessageId, normalizeWsMessage } from "../FriendChat/chatUtils";
 import { GroupChatProps, GroupRenderItem } from "./types";
 
 type UseGroupChatParams = Pick<
@@ -51,8 +51,8 @@ export function useGroupChat({
   const [friendsList, setFriendsList] = useState<UserDTO[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [addingMemberId, setAddingMemberId] = useState<number | null>(null);
-  const [typingLabel, setTypingLabel] = useState<string | null>(null);
-  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [typingUserId, setTypingUserId] = useState<number | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [messageActionPending, setMessageActionPending] = useState(false);
   const [pendingDeleteMessage, setPendingDeleteMessage] = useState<WsMessageDTO | null>(null);
@@ -89,6 +89,15 @@ export function useGroupChat({
   useEffect(() => {
     setIsExpanded(initialExpanded);
   }, [conversationId, initialExpanded]);
+
+  useEffect(() => {
+    setNicknames((prev) => {
+      const next = new Map(prev);
+      initialParticipants.forEach((p) => next.set(p.id, p.nickname));
+      next.set(myUserId, myNickname);
+      return next;
+    });
+  }, [conversationId, initialParticipants, myUserId, myNickname]);
 
   useEffect(() => {
     onExpandedChange?.(isExpanded);
@@ -219,10 +228,27 @@ export function useGroupChat({
   const nickOf = useCallback(
     (uid: number) => {
       if (uid === myUserId) return myNickname;
-      return nicknames.get(uid) ?? `User ${uid}`;
+      const cached = nicknames.get(uid);
+      if (cached) return cached;
+
+      const fromParticipant = detail?.participants?.find((p) => p.userId === uid)?.nickname;
+      if (fromParticipant) return fromParticipant;
+
+      const fromKnown = detail?.knownParticipants?.find((p) => p.userId === uid)?.nickname;
+      if (fromKnown) return fromKnown;
+
+      const fromInitial = initialParticipants.find((p) => p.id === uid)?.nickname;
+      if (fromInitial) return fromInitial;
+
+      return `User ${uid}`;
     },
-    [myUserId, myNickname, nicknames]
+    [detail, initialParticipants, myNickname, myUserId, nicknames]
   );
+
+  const typingLabel = useMemo(() => {
+    if (!typingUserId) return null;
+    return `${nickOf(typingUserId)} is typing...`;
+  }, [nickOf, typingUserId]);
 
   useEffect(() => {
     return () => {
@@ -238,16 +264,16 @@ export function useGroupChat({
       if (raw?.type === "TYPING") {
         const uid = Number(raw.userId);
         if (uid && uid !== myUserId) {
-          setTypingLabel(`${nickOf(uid)} is typing...`);
+          setTypingUserId(uid);
           if (typingClearTimerRef.current !== null) {
             window.clearTimeout(typingClearTimerRef.current);
           }
-          typingClearTimerRef.current = window.setTimeout(() => setTypingLabel(null), 3000);
+          typingClearTimerRef.current = window.setTimeout(() => setTypingUserId(null), 3000);
         }
         return;
       }
       if (raw?.type === "MESSAGE_DELETED") {
-        const messageId = Number(raw.messageId ?? raw.message?.id);
+        const messageId = getMutationMessageId(raw);
         if (!messageId) return;
         setMessages((prev) =>
           prev.map((x) =>
@@ -257,8 +283,8 @@ export function useGroupChat({
         return;
       }
       if (raw?.type === "MESSAGE_EDITED") {
-        const updated = (raw.message ?? raw) as WsMessageDTO;
-        if (!updated?.id) return;
+        const updated = normalizeWsMessage(raw.message ?? raw);
+        if (!updated.id) return;
         setMessages((prev) =>
           prev.map((x) =>
             x.id === updated.id
@@ -266,20 +292,22 @@ export function useGroupChat({
                   ...x,
                   content: updated.content ?? x.content,
                   editedAt: updated.editedAt ?? new Date().toISOString(),
+                  createdAtMillis: updated.createdAtMillis ?? x.createdAtMillis,
+                  deleted: false,
                 }
               : x
           )
         );
         return;
       }
-      const m = raw as WsMessageDTO;
+      const m = normalizeWsMessage(raw);
       if (!isMessageVisible(Number(m.senderId))) return;
       setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
       if (m.senderId !== myUserId) {
         markRead(conversationId).catch(() => {});
       }
     },
-    [conversationId, isMessageVisible, markRead, myUserId, nickOf]
+    [conversationId, isMessageVisible, markRead, myUserId]
   );
 
   useEffect(() => {

@@ -6,7 +6,6 @@ interface FriendChatInputProps {
   blockHint?: string | null;
   isSending: boolean;
   conversationId: number | null;
-  typingLabel?: string | null;
   onInputChange: (value: string) => void;
   onSend: () => void;
 }
@@ -19,7 +18,6 @@ export default function FriendChatInput({
   blockHint,
   isSending,
   conversationId,
-  typingLabel,
   onInputChange,
   onSend,
 }: FriendChatInputProps) {
@@ -34,9 +32,6 @@ export default function FriendChatInput({
 
   return (
     <div className="border-t border-white/10 pt-3">
-      {typingLabel && (
-        <div className="mb-2 px-1 text-xs italic text-indigo-300/80">{typingLabel}</div>
-      )}
       <div className="flex items-center gap-2">
       <input
         ref={inputRef}

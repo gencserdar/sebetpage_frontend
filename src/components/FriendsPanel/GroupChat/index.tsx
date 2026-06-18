@@ -42,10 +42,9 @@ export default function GroupChat(props: GroupChatProps) {
   );
 
   const messageList = (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <GroupChatMessageList
         listRef={chat.listRef}
-        expanded={chat.isExpanded}
         loading={chat.loading}
         loadingOlder={chat.loadingOlder}
         renderItems={chat.renderItems}
@@ -85,6 +84,7 @@ export default function GroupChat(props: GroupChatProps) {
   ) : null;
 
   const input = (
+    <div className="shrink-0">
     <FriendChatInput
       inputRef={chat.inputRef}
       inputValue={chat.inputValue}
@@ -93,8 +93,8 @@ export default function GroupChat(props: GroupChatProps) {
       conversationId={chat.conversationId}
       onInputChange={chat.handleInputChange}
       onSend={chat.handleSend}
-      typingLabel={chat.typingLabel}
     />
+    </div>
   );
 
   const settingsModal = (
@@ -148,7 +148,7 @@ export default function GroupChat(props: GroupChatProps) {
     <>
       <div
         style={{ zIndex: 55 }}
-        className="fixed inset-0 flex min-h-0 flex-col bg-app-surface/95 p-3 text-white backdrop-blur-xl md:inset-auto md:bottom-4 md:right-4 md:h-auto md:min-h-0 md:w-[min(24rem,calc(100vw-2rem))] md:rounded-2xl md:border md:border-white/10 md:p-4 md:shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+        className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-app-surface/95 p-3 text-white backdrop-blur-xl md:inset-auto md:bottom-4 md:right-4 md:h-[min(32rem,calc(100vh-2rem))] md:max-h-[calc(100vh-2rem)] md:min-h-0 md:w-[min(24rem,calc(100vw-2rem))] md:rounded-2xl md:border md:border-white/10 md:p-4 md:shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
       >
         {header}
         {actionErrorBanner}

@@ -8,7 +8,7 @@ interface GroupChatBubbleProps {
   messages: WsMessageDTO[];
   myUserId: number;
   nickOf: (userId: number) => string;
-  editingMessageId?: number | null;
+  editingMessageId?: string | null;
   editDraft?: string;
   onEditDraftChange?: (value: string) => void;
   onEditSave?: () => void;
@@ -87,7 +87,6 @@ export default function GroupChatBubble({
         {showHeader && !isEditing && (
           <div className={`mb-0.5 px-1 text-xs text-gray-400 ${mine ? "text-right" : "text-left"}`}>
             {mine ? `${fmtTime(m.createdAt)}` : `${nickOf(m.senderId)} - ${fmtTime(m.createdAt)}`}
-            {m.editedAt ? " · edited" : ""}
           </div>
         )}
 
@@ -166,6 +165,13 @@ export default function GroupChatBubble({
             >
               {m.content}
             </div>
+            {m.editedAt && (
+              <div
+                className={`mt-0.5 text-[11px] italic text-gray-500 ${mine ? "text-right" : "text-left"}`}
+              >
+                (edited)
+              </div>
+            )}
             {showActions && (
               <button
                 type="button"
@@ -184,6 +190,7 @@ export default function GroupChatBubble({
             )}
           </div>
         )}
+
       </div>
     </div>
   );

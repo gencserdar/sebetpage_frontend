@@ -89,7 +89,14 @@ export default function HomePage() {
   const handleGroupChanged = useCallback((detail: MessagingGroupDetail) => {
     setSelectedGroupState((prev) =>
       prev && prev.group.id === detail.id
-        ? { ...prev, group: { ...prev.group, ...detail } }
+        ? {
+            ...prev,
+            group: { ...prev.group, ...detail },
+            participants: detail.participants.map((p) => ({
+              id: p.userId,
+              nickname: p.nickname,
+            })),
+          }
         : prev
     );
   }, []);

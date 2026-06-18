@@ -4,14 +4,13 @@ import { WsMessageDTO } from "../../../types/WSMessageDTO";
 
 interface GroupChatMessageListProps {
   listRef: React.RefObject<HTMLDivElement | null>;
-  expanded: boolean;
   loading: boolean;
   loadingOlder: boolean;
   renderItems: GroupRenderItem[];
   messages: WsMessageDTO[];
   myUserId: number;
   nickOf: (userId: number) => string;
-  editingMessageId?: number | null;
+  editingMessageId?: string | null;
   editDraft?: string;
   onEditDraftChange?: (value: string) => void;
   onEditSave?: () => void;
@@ -23,7 +22,6 @@ interface GroupChatMessageListProps {
 
 export default function GroupChatMessageList({
   listRef,
-  expanded,
   loading,
   loadingOlder,
   renderItems,
@@ -92,9 +90,7 @@ export default function GroupChatMessageList({
   return (
     <div
       ref={listRef}
-      className={`mb-3 overflow-y-auto rounded-xl bg-gradient-to-b from-app-surface/40 to-app-bg/80 p-3 ${
-        expanded ? "min-h-0 flex-1" : "h-80 max-md:min-h-0 max-md:flex-1"
-      }`}
+      className="mb-3 min-h-0 flex-1 overflow-y-auto rounded-xl bg-gradient-to-b from-app-surface/40 to-app-bg/80 p-3"
       style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(99,102,241,.5) rgba(0,0,0,.4)" }}
     >
       {loadingOlder && (

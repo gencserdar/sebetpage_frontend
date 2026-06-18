@@ -5,6 +5,7 @@
 
 import { api } from "./apiService";
 import { WsMessageDTO } from "../types/WSMessageDTO";
+import { normalizeWsMessage } from "../components/FriendsPanel/FriendChat/chatUtils";
 
 function parseApiError(raw: string, fallback: string): string {
   const trimmed = raw.trim();
@@ -205,7 +206,7 @@ class ChatApiService {
 
   async deleteMessage(
     conversationId: number,
-    messageId: number,
+    messageId: string,
     createdAtMillis: number
   ): Promise<void> {
     const res = await api(
@@ -220,7 +221,7 @@ class ChatApiService {
 
   async editMessage(
     conversationId: number,
-    messageId: number,
+    messageId: string,
     createdAtMillis: number,
     content: string
   ): Promise<WsMessageDTO> {
@@ -236,7 +237,7 @@ class ChatApiService {
       const err = await res.text();
       throw new Error(parseApiError(err, "Failed to edit message"));
     }
-    return res.json() as Promise<WsMessageDTO>;
+    return normalizeWsMessage(await res.json());
   }
 }
 

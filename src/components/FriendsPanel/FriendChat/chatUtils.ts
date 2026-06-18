@@ -1,4 +1,26 @@
+import type { WsMessageDTO } from "../../../types/WSMessageDTO";
+
 export const PAGE_SIZE = 50;
+
+export function normalizeWsMessage(raw: any): WsMessageDTO {
+  return {
+    id: String(raw.id),
+    senderId: Number(raw.senderId),
+    conversationId: Number(raw.conversationId),
+    content: raw.content ?? "",
+    createdAt: raw.createdAt,
+    createdAtMillis:
+      raw.createdAtMillis != null && raw.createdAtMillis !== ""
+        ? Number(raw.createdAtMillis)
+        : undefined,
+    editedAt:
+      raw.editedAt ??
+      (raw.editedAtMillis != null && raw.editedAtMillis !== ""
+        ? new Date(Number(raw.editedAtMillis)).toISOString()
+        : undefined),
+    deleted: Boolean(raw.deleted),
+  };
+}
 
 export function isToday(d: Date) {
   const now = new Date();
@@ -34,6 +56,10 @@ export function dayLabel(d: Date) {
     month: "short",
     ...(sameYear ? {} : { year: "numeric" }),
   });
+}
+
+export function getMutationMessageId(raw: any): string {
+  return String(raw?.messageId ?? raw?.message?.id ?? raw?.id ?? "");
 }
 
 export function getMessageCreatedAtMillis(message: { createdAt: string; createdAtMillis?: number }) {
