@@ -1,4 +1,4 @@
-import { Edit3, Snowflake } from "lucide-react";
+import { Edit3, Snowflake, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import ProfileField from "../ProfilePopup/ProfileField";
 import ProfilePasswordForm from "../ProfilePopup/ProfilePasswordForm";
@@ -28,7 +28,9 @@ export interface AccountSettingsPanelProps {
   onPasswordSubmit: () => void;
   onPasswordCancel: () => void;
   onFreezeAccount: () => void;
+  onDeleteAccount: () => void;
   freezeLoading?: boolean;
+  deleteLoading?: boolean;
 }
 
 function SettingsCard({
@@ -67,7 +69,9 @@ export default function AccountSettingsPanel({
   onPasswordSubmit,
   onPasswordCancel,
   onFreezeAccount,
+  onDeleteAccount,
   freezeLoading = false,
+  deleteLoading = false,
 }: AccountSettingsPanelProps) {
   const fieldProps = {
     canEdit: true,
@@ -207,6 +211,29 @@ export default function AccountSettingsPanel({
                 className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
               >
                 {freezeLoading ? "Freezing..." : "Freeze account"}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-red-500/25 bg-red-500/[0.04] p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/15">
+              <Trash2 size={18} className="text-red-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-white">Delete account</h3>
+              <p className="mt-1 text-sm leading-relaxed text-gray-500">
+                Permanently remove your account data. Groups and communities stay
+                open if other members remain.
+              </p>
+              <button
+                type="button"
+                onClick={onDeleteAccount}
+                disabled={deleteLoading || freezeLoading || loading}
+                className="mt-4 rounded-lg border border-red-500/45 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
+              >
+                {deleteLoading ? "Deleting..." : "Delete account"}
               </button>
             </div>
           </div>

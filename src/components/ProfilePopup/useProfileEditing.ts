@@ -10,6 +10,7 @@ import {
   confirmPasswordChange,
   FieldUpdateResponse,
   freezeAccount,
+  deleteAccount,
 } from "../../services/profileService";
 import { useUser } from "../../context/UserContext";
 import { useProfileNavigation } from "../../hooks/useProfileNavigation";
@@ -61,6 +62,11 @@ export interface UseProfileEditingReturn {
   freezeConfirmOpen: boolean;
   closeFreezeConfirm: () => void;
   freezeLoading: boolean;
+  handleDeleteAccount: () => void;
+  confirmDeleteAccount: () => Promise<void>;
+  deleteConfirmOpen: boolean;
+  closeDeleteConfirm: () => void;
+  deleteLoading: boolean;
 }
 
 export function useProfileEditing({
@@ -73,6 +79,8 @@ export function useProfileEditing({
   const [loading, setLoading] = useState(false);
   const [freezeLoading, setFreezeLoading] = useState(false);
   const [freezeConfirmOpen, setFreezeConfirmOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [updatedFields, setUpdatedFields] = useState<Set<string>>(new Set());
   const [localUser, setLocalUser] = useState<UserDTO>(user);
 
@@ -373,6 +381,32 @@ export function useProfileEditing({
     }
   };
 
+  const handleDeleteAccount = () => {
+    setError({});
+    setDeleteConfirmOpen(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (!deleteLoading) setDeleteConfirmOpen(false);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setDeleteLoading(true);
+    setError({});
+    try {
+      await deleteAccount();
+      setDeleteConfirmOpen(false);
+      onClose();
+      await logout();
+    } catch (err) {
+      setError({
+        general: err instanceof Error ? err.message : "Could not delete account",
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return {
     editField,
     error,
@@ -408,5 +442,10 @@ export function useProfileEditing({
     freezeConfirmOpen,
     closeFreezeConfirm,
     freezeLoading,
+    handleDeleteAccount,
+    confirmDeleteAccount,
+    deleteConfirmOpen,
+    closeDeleteConfirm,
+    deleteLoading,
   };
 }

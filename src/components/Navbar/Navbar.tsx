@@ -10,6 +10,7 @@ interface NavbarProps {
   onAuthClick: () => void;
   onMessagesClick?: () => void;
   unreadCount?: number;
+  variant?: "default" | "landing";
 }
 
 const NAV_ITEMS = [
@@ -127,7 +128,9 @@ export default function Navbar({
   onAuthClick,
   onMessagesClick,
   unreadCount = 0,
+  variant = "default",
 }: NavbarProps) {
+  const isLanding = variant === "landing";
   const { user, loading } = useUser();
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
@@ -160,46 +163,78 @@ export default function Navbar({
   };
 
   return (
-    <header className="relative sticky top-0 z-50 border-b border-white/10 bg-app-bg">
-      <div className="flex min-w-0 items-center gap-3 px-3 py-2 sm:px-4 sm:py-2.5 lg:justify-between lg:gap-0 lg:px-8 lg:py-3">
+    <header
+      className={
+        isLanding
+          ? "relative z-50 bg-transparent"
+          : "relative sticky top-0 z-50 border-b border-white/10 bg-app-bg"
+      }
+    >
+      <div
+        className={
+          isLanding
+            ? "flex min-w-0 items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-10 lg:py-4"
+            : "flex min-w-0 items-center gap-3 px-3 py-2 sm:px-4 sm:py-2.5 lg:justify-between lg:gap-0 lg:px-8 lg:py-3"
+        }
+      >
         <div className="flex min-w-0 shrink-0 items-center">
           <Link
             to="/"
-            className="flex min-w-0 items-center gap-2 lg:gap-2.5"
+            className={`flex min-w-0 items-center gap-2.5 ${isLanding ? "gap-3" : "lg:gap-2.5"}`}
             aria-label="SebetPage home"
           >
             <img
               src="/img4.png"
               alt=""
-              className="h-9 w-9 shrink-0 sm:h-10 sm:w-10 lg:h-14 lg:w-14"
+              className={
+                isLanding
+                  ? "h-11 w-11 shrink-0 sm:h-12 sm:w-12 lg:h-14 lg:w-14"
+                  : "h-9 w-9 shrink-0 sm:h-10 sm:w-10 lg:h-14 lg:w-14"
+              }
             />
-            <span className="truncate text-lg font-bold tracking-tight text-white sm:text-xl lg:text-2xl">
+            <span
+              className={
+                isLanding
+                  ? "truncate text-xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] sm:text-2xl lg:text-3xl"
+                  : "truncate text-lg font-bold tracking-tight text-white sm:text-xl lg:text-2xl"
+              }
+            >
               SebetPage
             </span>
           </Link>
 
-          <div className="lg:hidden">
-            <ChevronToggle
-              open={mobilePanel === "nav"}
-              onClick={() => togglePanel("nav")}
-              label="Open navigation menu"
-              controls="mobile-main-nav"
-            />
-          </div>
+          {!isLanding && (
+            <div className="lg:hidden">
+              <ChevronToggle
+                open={mobilePanel === "nav"}
+                onClick={() => togglePanel("nav")}
+                label="Open navigation menu"
+                controls="mobile-main-nav"
+              />
+            </div>
+          )}
         </div>
 
-        <nav
-          className="ml-10 mr-auto hidden space-x-8 text-base text-gray-500 lg:flex xl:ml-40"
-          aria-label="Main navigation"
-        >
-          {NAV_ITEMS.map(({ label, title }) => (
-            <span key={label} className="cursor-default" title={title}>
-              {label}
-            </span>
-          ))}
-        </nav>
+        {!isLanding && (
+          <nav
+            className="ml-10 mr-auto hidden space-x-8 text-base text-gray-500 lg:flex xl:ml-40"
+            aria-label="Main navigation"
+          >
+            {NAV_ITEMS.map(({ label, title }) => (
+              <span key={label} className="cursor-default" title={title}>
+                {label}
+              </span>
+            ))}
+          </nav>
+        )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1 lg:gap-4">
+        <div
+          className={
+            isLanding
+              ? "flex shrink-0 items-center gap-2 sm:gap-3"
+              : "ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1 lg:gap-4"
+          }
+        >
           {user && !loading && (
             <>
               <div className="hidden items-center gap-2 md:flex lg:gap-4">
@@ -241,7 +276,30 @@ export default function Navbar({
             </>
           )}
 
-          {(!user || loading) && <UserMenu onAuthClick={onAuthClick} />}
+          {(!user || loading) && (
+            <div className="flex items-center gap-2 sm:gap-3">
+              {!loading && (
+                <Link
+                  to="/register"
+                  className={
+                    isLanding
+                      ? "inline-flex rounded-full border border-white/25 bg-white/[0.12] px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_24px_rgba(0,0,0,0.35)] backdrop-blur-sm transition hover:bg-white/[0.2] sm:px-6 sm:py-2.5 sm:text-base"
+                      : "inline-flex rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/[0.12] sm:px-5 sm:py-2 sm:text-sm"
+                  }
+                >
+                  Register
+                </Link>
+              )}
+              <UserMenu
+                onAuthClick={onAuthClick}
+                authButtonClassName={
+                  isLanding
+                    ? "shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_24px_rgba(0,0,0,0.35)] sm:px-6 sm:py-3 sm:text-base"
+                    : undefined
+                }
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -254,7 +312,7 @@ export default function Navbar({
         />
       )}
 
-      {mobilePanel === "nav" && (
+      {mobilePanel === "nav" && !isLanding && (
         <nav
           id="mobile-main-nav"
           className="relative z-50 border-t border-white/10 bg-app-bg lg:hidden"

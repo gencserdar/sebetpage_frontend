@@ -5,6 +5,7 @@ import Modal from "../components/Login/Modal";
 import AuthPopup from "../components/Login/AuthPopup/index";
 import AppAmbientGlow from "../components/AppAmbientGlow";
 import Navbar from "../components/Navbar/Navbar";
+import LandingPage from "../components/Landing/LandingPage";
 import { useUser } from "../context/UserContext";
 import { UserDTO } from "../types/userDTO";
 import FriendsPanel from "../components/FriendsPanel/FriendsPanel";
@@ -13,7 +14,7 @@ import GroupChat from "../components/FriendsPanel/GroupChat/index";
 import ExpandedMessagesRail from "../components/FriendsPanel/ExpandedMessagesRail";
 import { useChatSocketContext } from "../context/ChatSocketContext";
 import { MessagingGroup, MessagingGroupDetail } from "../services/chatApiService";
-import { appGradientBtnClass, appGradientHeadingClass, appPageClass } from "../theme/appTheme";
+import { appGradientHeadingClass, appPageClass } from "../theme/appTheme";
 
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -146,39 +147,39 @@ export default function HomePage() {
 
   return (
     <div className={appPageClass}>
-      <AppAmbientGlow />
+      {user ? (
+        <>
+          <AppAmbientGlow />
 
-      {/* Navbar */}
-      <div className="relative transition-all duration-300">
-        <Navbar
-          onAuthClick={handleAuthClick}
-          onMessagesClick={() => setShowFriendsPanel(true)}
-          unreadCount={unreadTotal}
-        />
-      </div>
+          <div className="relative transition-all duration-300">
+            <Navbar
+              onAuthClick={handleAuthClick}
+              onMessagesClick={() => setShowFriendsPanel(true)}
+              unreadCount={unreadTotal}
+            />
+          </div>
 
-      {/* Main content */}
-      <div className="relative flex-1 transition-all duration-300">
-        {/* Hero Section */}
-        <section className="flex flex-col items-center justify-center px-4 py-24 text-center md:py-40">
-          <h1 className={`mb-6 text-4xl font-bold leading-tight md:text-6xl ${appGradientHeadingClass}`}>
-            {user ? "Welcome back!" : "Create. Share. Connect."}
-          </h1>
-          <p className="mb-8 max-w-xl text-lg text-gray-300">
-            {user
-              ? "This is your personalized dashboard."
-              : "SebetPage helps you turn your creative passion into a meaningful experience."}
-          </p>
-          {!user && (
-            <button
-              onClick={handleAuthClick}
-              className={`rounded-full px-8 py-3 text-lg font-medium ${appGradientBtnClass}`}
-            >
-              Get Started
-            </button>
-          )}
-        </section>
-      </div>
+          <div className="relative flex-1 transition-all duration-300">
+            <section className="flex flex-col items-center justify-center px-4 py-24 text-center md:py-40">
+              <h1 className={`mb-6 text-4xl font-bold leading-tight md:text-6xl ${appGradientHeadingClass}`}>
+                Welcome back!
+              </h1>
+              <p className="mb-8 max-w-xl text-lg text-gray-300">
+                This is your personalized dashboard.
+              </p>
+            </section>
+          </div>
+        </>
+      ) : (
+        <div className="relative min-h-svh">
+          <LandingPage onLoginClick={handleAuthClick} />
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-50">
+            <div className="pointer-events-auto">
+              <Navbar variant="landing" onAuthClick={handleAuthClick} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Friends button */}
       {user && (

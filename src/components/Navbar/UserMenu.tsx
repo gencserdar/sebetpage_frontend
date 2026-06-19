@@ -7,12 +7,13 @@ interface UserMenuProps {
   onAuthClick: () => void;
   inline?: boolean;
   onNavigate?: () => void;
+  authButtonClassName?: string;
 }
 
 const rowClass =
   "flex min-h-[3.25rem] w-full items-center border-b border-white/[0.06] px-5 text-left text-base transition last:border-b-0 active:bg-white/10";
 
-export default function UserMenu({ onAuthClick, inline = false, onNavigate }: UserMenuProps) {
+export default function UserMenu({ onAuthClick, inline = false, onNavigate, authButtonClassName }: UserMenuProps) {
   const navigate = useNavigate();
   const { openProfile } = useProfileNavigation();
   const { user, loading, logout } = useUser();
@@ -58,7 +59,10 @@ export default function UserMenu({ onAuthClick, inline = false, onNavigate }: Us
           background: `radial-gradient(circle at ${hoverPos.x}% ${hoverPos.y}%, #6366f1, #8b5cf6, #a78bfa)`,
           transition: "background 0.2s ease-out",
         }}
-        className="shrink-0 rounded-full px-4 py-1.5 text-sm font-medium text-white sm:px-5 sm:py-2"
+        className={
+          authButtonClassName ??
+          "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium text-white sm:px-5 sm:py-2"
+        }
       >
         Log in
       </button>

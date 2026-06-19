@@ -6,6 +6,7 @@ import SettingsSidebar from "../components/Settings/SettingsSidebar";
 import ProfileSettingsSection from "../components/Settings/ProfileSettingsSection";
 import AccountSettingsSection from "../components/Settings/AccountSettingsSection";
 import BlockedUsersSection from "../components/Settings/BlockedUsersSection";
+import ContactFeedbackSection from "../components/Settings/ContactFeedbackSection";
 import SessionsSection from "../components/Settings/SessionsSection";
 import { SettingsSection } from "../components/Settings/types";
 import { useUser } from "../context/UserContext";
@@ -16,7 +17,8 @@ function isSettingsSection(value: unknown): value is SettingsSection {
     value === "profile" ||
     value === "account" ||
     value === "blocked" ||
-    value === "sessions"
+    value === "sessions" ||
+    value === "support"
   );
 }
 
@@ -66,6 +68,7 @@ export default function SettingsPage() {
             {section === "account" && <AccountSettingsSection />}
             {section === "sessions" && <SessionsSection />}
             {section === "blocked" && <BlockedUsersSection />}
+            {section === "support" && <ContactFeedbackSection />}
           </main>
         </div>
       </div>

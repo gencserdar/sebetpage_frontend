@@ -1,4 +1,4 @@
-import { Ban, KeyRound, Monitor, Sparkles, User, type LucideIcon } from "lucide-react";
+import { Ban, KeyRound, MessageCircle, Monitor, Sparkles, User, type LucideIcon } from "lucide-react";
 import SettingsSidebarProfileCard from "./SettingsSidebarProfileCard";
 import { SettingsSection, SETTINGS_SECTIONS } from "./types";
 
@@ -12,6 +12,7 @@ const SECTION_ICONS: Record<SettingsSection, LucideIcon> = {
   account: KeyRound,
   sessions: Monitor,
   blocked: Ban,
+  support: MessageCircle,
 };
 
 export default function SettingsSidebar({ active, onSelect }: SettingsSidebarProps) {

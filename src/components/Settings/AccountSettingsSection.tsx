@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { UserDTO } from "../../types/userDTO";
+import DeleteAccountConfirmModal from "../DeleteAccountConfirmModal";
 import FreezeAccountConfirmModal from "../FreezeAccountConfirmModal";
 import ProfileVerifyModal from "../ProfilePopup/ProfileVerifyModal";
 import { useProfileEditing } from "../ProfilePopup/useProfileEditing";
@@ -35,7 +36,9 @@ function AccountSettingsSectionInner({ user, onNavigateHome }: AccountSettingsSe
         onPasswordSubmit={editing.handlePasswordSubmit}
         onPasswordCancel={() => editing.cancelEditing("password")}
         onFreezeAccount={editing.handleFreezeAccount}
+        onDeleteAccount={editing.handleDeleteAccount}
         freezeLoading={editing.freezeLoading}
+        deleteLoading={editing.deleteLoading}
       />
 
       {editing.freezeConfirmOpen && (
@@ -43,6 +46,14 @@ function AccountSettingsSectionInner({ user, onNavigateHome }: AccountSettingsSe
           loading={editing.freezeLoading}
           onClose={editing.closeFreezeConfirm}
           onConfirm={editing.confirmFreezeAccount}
+        />
+      )}
+
+      {editing.deleteConfirmOpen && (
+        <DeleteAccountConfirmModal
+          loading={editing.deleteLoading}
+          onClose={editing.closeDeleteConfirm}
+          onConfirm={editing.confirmDeleteAccount}
         />
       )}
 

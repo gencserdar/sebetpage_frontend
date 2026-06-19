@@ -81,6 +81,11 @@ export const freezeAccount = async (): Promise<void> => {
   if (!res.ok) throw new Error(await res.text());
 };
 
+export const deleteAccount = async (): Promise<void> => {
+  const res = await api("/api/user/account", { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+};
+
 export const unfreezeAccount = async (): Promise<void> => {
   const res = await api("/api/user/unfreeze", { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
