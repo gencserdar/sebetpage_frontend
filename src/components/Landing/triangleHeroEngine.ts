@@ -548,12 +548,43 @@ export function wrapPrev(i: number, count: number) {
   return (i - 1 + count) % count;
 }
 
-export function loadHeroImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+function makeGradientImage(hue: number): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
+    const c = document.createElement("canvas");
+    c.width = 1200;
+    c.height = 800;
+    const g = c.getContext("2d");
+    const img = new Image();
+    if (!g) {
+      img.onload = () => resolve(img);
+      img.src =
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
+      return;
+    }
+    const grd = g.createLinearGradient(0, 0, c.width, c.height);
+    grd.addColorStop(0, `hsl(${hue}, 58%, 30%)`);
+    grd.addColorStop(1, `hsl(${(hue + 50) % 360}, 52%, 13%)`);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, c.width, c.height);
+    img.onload = () => resolve(img);
+    img.src = c.toDataURL("image/jpeg", 0.82);
+  });
+}
+
+// Resolves with the requested image, or a gradient placeholder if it fails to
+// load — so a removed/blocked photo URL never leaves a blank hero.
+export function loadHeroImage(
+  src: string,
+  fallbackHue = 240
+): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
     const img = new Image();
     img.decoding = "async";
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = () => {
+      makeGradientImage(fallbackHue).then(resolve);
+    };
     img.src = src;
   });
 }

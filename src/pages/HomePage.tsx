@@ -29,6 +29,7 @@ export default function HomePage() {
 
   const [showFriendsPanel, setShowFriendsPanel] = useState(false);
   const [unreadTotal, setUnreadTotal] = useState(0);
+  const [landingDetailsOpen, setLandingDetailsOpen] = useState(false);
 
   // Tap into the WS singleton so the Messages button gets a live badge whenever
   // a message arrives in any conversation, even when the panel is closed.
@@ -172,9 +173,16 @@ export default function HomePage() {
         </>
       ) : (
         <div className="relative min-h-svh">
-          <LandingPage onLoginClick={handleAuthClick} />
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-50">
-            <div className="pointer-events-auto">
+          <LandingPage
+            onLoginClick={handleAuthClick}
+            onDetailsOpenChange={setLandingDetailsOpen}
+          />
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-0 z-50 transition-opacity duration-300 ${
+              landingDetailsOpen ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <div className={landingDetailsOpen ? "pointer-events-none" : "pointer-events-auto"}>
               <Navbar variant="landing" onAuthClick={handleAuthClick} />
             </div>
           </div>

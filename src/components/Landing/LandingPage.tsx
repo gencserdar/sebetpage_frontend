@@ -1,19 +1,14 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link } from "react-router-dom";
-import {
-  ArrowRight,
-  HeartHandshake,
-  Layers,
-  MessageCircle,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   HERO_DIR_LOCK_PX,
   HERO_SWIPE_THRESHOLD,
@@ -32,57 +27,531 @@ import {
   wrapPrev,
   type HeroEngine,
 } from "./triangleHeroEngine";
+import DetailsLavaGlow, {
+  type LavaPaletteState,
+  type LavaPointerState,
+} from "./DetailsLavaGlow";
+import {
+  EXPLORE_SECTION_PALETTES,
+  paletteToCssBase,
+} from "./exploreFluidPalettes";
 
-const landingImages = [
+type TitleFrom = "left" | "right" | "top" | "bottom";
+type TitleAlign = "left" | "center" | "right";
+type TitleBlock = "top" | "center" | "bottom" | "between";
+
+interface TitleLine {
+  text: string;
+  from: TitleFrom;
+  align: TitleAlign;
+  /** When set, skips automatic contrast sampling for this line. */
+  color?: string;
+}
+
+interface HeroSlide {
+  src: string;
+  hue: number;
+  title: string;
+  subtitle: string;
+  block: TitleBlock;
+  lines: TitleLine[];
+}
+
+const img = (id: string) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1600&q=85`;
+
+// Ordered as a narrative: discover people → plan → share → talk → personalize →
+// stay private → everything together (closing summary).
+const heroSlides: HeroSlide[] = [
   {
-    src: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1600&q=85",
-    label: "Friends together",
+    src: img("1529156069898-49953e39b3ac"),
+    hue: 250,
+    title: "Find your people.",
+    subtitle:
+      "Create communities around your interests and grow meaningful connections.",
+    block: "center",
+    lines: [
+      { text: "Find your", from: "left", align: "left", color: "#FFDB58" },
+      { text: "people.", from: "right", align: "left", color: "#ffffff" },
+    ],
   },
   {
-    src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=85",
-    label: "A team that clicks",
+    src: img("1492684223066-81342ee5ff30"),
+    hue: 330,
+    title: "Make plans happen.",
+    subtitle:
+      "Create events, invite friends, and organize unforgettable experiences together.",
+    block: "between",
+    lines: [
+      { text: "Make plans", from: "left", align: "left", color : "#697CF5" },
+      { text: "happen.", from: "right", align: "right" },
+    ],
   },
   {
-    src: "https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=1600&q=85",
-    label: "Real conversations",
+    src: img("1516450360452-9312f5e86fc7"),
+    hue: 200,
+    title: "Share Your moment.",
+    subtitle:
+      "Post photos, videos, and updates that keep your memories alive.",
+    block: "top",
+    lines: [
+      { text: "Share", from: "top", align: "center", color: "#BD69F5" },
+      { text: "your moments.", from: "top", align: "center", color: "#ffffff" },
+    ],
   },
   {
-    src: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1600&q=85",
-    label: "Communities that gather",
+    src: img("1542751371-adc38448a05e"),
+    hue: 280,
+    title: "Talk like you're there.",
+    subtitle:
+      "Jump into voice rooms and stay connected, whether you're gaming, studying, or just hanging out.",
+    block: "bottom",
+    lines: [
+      { text: "Talk like", from: "right", align: "right" },
+      { text: "you're there.", from: "right", align: "right" },
+    ],
+  },
+  {
+    src: img("1558618666-fcd25c85cd64"),
+    hue: 150,
+    title: "Your Space. Your Rules.",
+    subtitle:
+      "Customize your profile, communities, and events to create a social experience that truly feels like yours.",
+    block: "between",
+    lines: [
+      { text: "Your Space.", from: "left", align: "left", color: "#C1E34F" },
+      { text: "Your Rules.", from: "right", align: "right" },
+    ],
+  },
+  {
+    src: img("1563986768609-322da13575f3"),
+    hue: 215,
+    title: "Privacy on your terms.",
+    subtitle:
+      "Control who sees your profile, joins your communities, and accesses your content.",
+    block: "center",
+    lines: [
+      { text: "Privacy", from: "bottom", align: "center", color:"#4F8FE3" },
+      { text: "on your terms.", from: "bottom", align: "center", color: "#ffffff" },
+    ],
+  },
+  {
+    src: img("1522202176988-66273c2fd55f"),
+    hue: 235,
+    title: "Everything your circle needs.",
+    subtitle:
+      "Communities, chats, events, media sharing, and customization—all in one platform.",
+    block: "center",
+    lines: [
+      { text: "Everything", from: "left", align: "center", color: "rgb(186, 96, 108)" },
+      { text: "your circle needs.", from: "right", align: "center" },
+    ],
   },
 ];
 
-const featureCards = [
-  {
-    icon: MessageCircle,
-    title: "Conversations that flow",
-    text: "Direct chats with live typing and seen states, so talking never feels like waiting.",
-  },
-  {
-    icon: Users,
-    title: "Circles, not crowds",
-    text: "Spin up private groups in seconds and keep your closest people in one place.",
-  },
-  {
-    icon: Layers,
-    title: "Profiles with depth",
-    text: "Show who you are with a profile people actually want to scroll through.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "You stay in control",
-    text: "Block, freeze, delete, and manage every active session whenever you want.",
-  },
-];
+const exploreSectionCssColors = EXPLORE_SECTION_PALETTES.map(paletteToCssBase);
 
-function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
+const count = heroSlides.length;
+
+type TitleTone = "light" | "dark";
+
+interface LineStyle {
+  tone: TitleTone;
+  color: string;
+}
+
+const PATCH_W = 48;
+const PATCH_H = 28;
+const tonePatchCanvas = document.createElement("canvas");
+tonePatchCanvas.width = PATCH_W;
+tonePatchCanvas.height = PATCH_H;
+const tonePatchCtx = tonePatchCanvas.getContext("2d", {
+  willReadFrequently: true,
+});
+
+interface RegionInfo {
+  avgR: number;
+  avgG: number;
+  avgB: number;
+  p10Lum: number;
+  dark: { r: number; g: number; b: number };
+}
+
+interface SampleBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const FALLBACK_DARK = { r: 36, g: 30, b: 48 };
+const FALLBACK_REGION: RegionInfo = {
+  avgR: 18,
+  avgG: 18,
+  avgB: 22,
+  p10Lum: 18,
+  dark: FALLBACK_DARK,
+};
+
+// Reads the image patch sitting directly behind one title line's real box and
+// returns its average colour plus the dominant dark tone in that exact area.
+function analyzeBox(
+  img: HTMLImageElement,
+  vw: number,
+  vh: number,
+  box: SampleBox
+): RegionInfo {
+  if (!tonePatchCtx || !img.naturalWidth || !img.naturalHeight) {
+    return FALLBACK_REGION;
+  }
+
+  const scale = Math.max(vw / img.naturalWidth, vh / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  const ox = (vw - dw) / 2;
+  const oy = (vh - dh) / 2;
+
+  // Read a touch beyond the glyphs so thin strokes still rest on their real bg.
+  const padX = Math.max(8, box.w * 0.05);
+  const padY = Math.max(6, box.h * 0.16);
+  let rx = box.x - padX;
+  let ry = box.y - padY;
+  let rw = box.w + padX * 2;
+  let rh = box.h + padY * 2;
+  rx = Math.max(0, Math.min(rx, vw - 1));
+  ry = Math.max(0, Math.min(ry, vh - 1));
+  rw = Math.max(1, Math.min(rw, vw - rx));
+  rh = Math.max(1, Math.min(rh, vh - ry));
+
+  const ix = (rx - ox) / scale;
+  const iy = (ry - oy) / scale;
+  const iw = rw / scale;
+  const ih = rh / scale;
+
+  try {
+    tonePatchCtx.clearRect(0, 0, PATCH_W, PATCH_H);
+    tonePatchCtx.drawImage(img, ix, iy, iw, ih, 0, 0, PATCH_W, PATCH_H);
+    const data = tonePatchCtx.getImageData(0, 0, PATCH_W, PATCH_H).data;
+
+    let sr = 0;
+    let sg = 0;
+    let sb = 0;
+    let n = 0;
+    const lums: number[] = [];
+    const buckets = new Map<
+      string,
+      { count: number; r: number; g: number; b: number }
+    >();
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      sr += r;
+      sg += g;
+      sb += b;
+      n += 1;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      lums.push(lum);
+      if (lum > 150) continue;
+
+      const qr = Math.round(r / 16) * 16;
+      const qg = Math.round(g / 16) * 16;
+      const qb = Math.round(b / 16) * 16;
+      const key = `${qr}|${qg}|${qb}`;
+      const prev = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };
+      buckets.set(key, {
+        count: prev.count + 1,
+        r: prev.r + r,
+        g: prev.g + g,
+        b: prev.b + b,
+      });
+    }
+
+    let best = { count: 0, r: 0, g: 0, b: 0 };
+    buckets.forEach((bucket) => {
+      if (bucket.count > best.count) best = bucket;
+    });
+
+    const dark =
+      best.count > 0
+        ? {
+            r: Math.round(best.r / best.count),
+            g: Math.round(best.g / best.count),
+            b: Math.round(best.b / best.count),
+          }
+        : FALLBACK_DARK;
+
+    lums.sort((a, b) => a - b);
+    const p10Lum = lums.length > 0 ? lums[Math.floor(lums.length * 0.1)] : 0;
+
+    return n > 0
+      ? { avgR: sr / n, avgG: sg / n, avgB: sb / n, p10Lum, dark }
+      : { ...FALLBACK_REGION, dark };
+  } catch {
+    return FALLBACK_REGION;
+  }
+}
+
+// --- colour helpers ---------------------------------------------------------
+function rgbToHsl(r: number, g: number, b: number) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  const d = max - min;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    if (max === r) h = (((g - b) / d) % 6 + 6) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+  }
+  return { h, s, l };
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255),
+  };
+}
+
+// WCAG relative luminance (0..1) — used only to keep the dark tone deep enough.
+function lin(c: number) {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+function wcagLum(r: number, g: number, b: number) {
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+// A deep but still-colourful version of the dominant tone — "dark purple", not
+// flat black — kept dark enough to read on light/mid backgrounds.
+function toReadableDark(c: { r: number; g: number; b: number }) {
+  const { h, s } = rgbToHsl(c.r, c.g, c.b);
+  const sat = Math.min(1, Math.max(0.5, s));
+  let { r, g, b } = hslToRgb(h, sat, 0.16);
+  let guard = 0;
+  while (wcagLum(r, g, b) > 0.075 && guard < 6) {
+    r = Math.round(r * 0.86);
+    g = Math.round(g * 0.86);
+    b = Math.round(b * 0.86);
+    guard += 1;
+  }
+  return { r, g, b };
+}
+
+// Darkest pixels in the patch decide "near black"; average lightness picks the
+// coloured tone for everything else.
+const NEAR_BLACK_P10 = 52;
+
+function pickLineStyle(region: RegionInfo, scrim: number): LineStyle {
+  const k = 1 - scrim;
+  const p10 = region.p10Lum * k;
+  if (p10 < NEAR_BLACK_P10) {
+    return { tone: "light", color: "#ffffff" };
+  }
+  const { l, h, s } = rgbToHsl(
+    region.avgR * k,
+    region.avgG * k,
+    region.avgB * k
+  );
+  // Warm mid backgrounds → light burgundy (not flat white, not deep black).
+  if (l > 0.34 && l < 0.58 && (h < 50 || h > 310) && s > 0.08) {
+    const tinted = hslToRgb(h, Math.min(0.62, Math.max(0.38, s)), 0.44);
+    return {
+      tone: "dark",
+      color: `rgb(${tinted.r}, ${tinted.g}, ${tinted.b})`,
+    };
+  }
+  const dark = toReadableDark(region.dark);
+  return { tone: "dark", color: `rgb(${dark.r}, ${dark.g}, ${dark.b})` };
+}
+
+function manualLineStyle(color: string): LineStyle {
+  const c = color.trim().toLowerCase();
+  const light =
+    c === "#fff" ||
+    c === "#ffffff" ||
+    c === "white" ||
+    c.startsWith("rgb(255");
+  return { tone: light ? "light" : "dark", color };
+}
+
+function lineAnchor(
+  slide: HeroSlide,
+  lineIndex: number,
+  line: TitleLine
+): { nx: number; ny: number } {
+  const n = slide.lines.length;
+  let ny: number;
+
+  if (slide.block === "top") ny = 0.2 + lineIndex * 0.09;
+  else if (slide.block === "bottom") ny = 0.8 - (n - 1 - lineIndex) * 0.09;
+  else if (slide.block === "between") ny = lineIndex === 0 ? 0.2 : 0.78;
+  else ny = n === 1 ? 0.5 : 0.4 + lineIndex * 0.14;
+
+  let nx: number;
+  if (line.align === "left") nx = 0.14;
+  else if (line.align === "right") nx = 0.86;
+  else nx = 0.5;
+
+  return { nx, ny };
+}
+
+// Fallback box (used until the real line elements have been measured).
+function anchorBox(
+  slide: HeroSlide,
+  lineIndex: number,
+  line: TitleLine,
+  vw: number,
+  vh: number
+): SampleBox {
+  const { nx, ny } = lineAnchor(slide, lineIndex, line);
+  const w = vw * 0.32;
+  const h = vh * 0.1;
+  return { x: nx * vw - w / 2, y: ny * vh - h / 2, w, h };
+}
+
+// Box of `el` relative to `ancestor`, derived from offsetLeft/Top so it is
+// unaffected by the lines' slide-in transform animations.
+function offsetRect(el: HTMLElement, ancestor: HTMLElement): SampleBox {
+  let x = 0;
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    node = node.offsetParent as HTMLElement | null;
+  }
+  let ax = 0;
+  let ay = 0;
+  let anc: HTMLElement | null = ancestor;
+  while (anc) {
+    ax += anc.offsetLeft;
+    ay += anc.offsetTop;
+    anc = anc.offsetParent as HTMLElement | null;
+  }
+  return { x: x - ax, y: y - ay, w: el.offsetWidth, h: el.offsetHeight };
+}
+
+function scrimDarkenAt(ny: number) {
+  const top = Math.max(0, 1 - ny / 0.12) * 0.35;
+  const bottom = Math.max(0, 1 - (1 - ny) / 0.55) * 0.45;
+  const radial =
+    ny < 0.65 ? Math.max(0, (ny - 0.08) / 0.57) * 0.35 : 0.22;
+  return Math.min(0.8, top + bottom + radial);
+}
+
+function smoothstep(t: number) {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
+function sectionOpacity(seg: number, i: number, slideCount: number) {
+  const i0 = Math.max(0, Math.min(slideCount - 1, Math.floor(seg)));
+  const i1 = Math.min(slideCount - 1, i0 + 1);
+  const frac = seg - i0;
+  if (i !== i0 && i !== i1) return 0;
+  if (i0 === i1) return i === i0 ? 1 : 0;
+  if (i === i0) return 1 - smoothstep(Math.min(1, frac / 0.5));
+  return smoothstep(Math.max(0, (frac - 0.28) / 0.55));
+}
+
+function computeLineStyles(
+  img: HTMLImageElement,
+  vw: number,
+  vh: number,
+  slide: HeroSlide,
+  boxes: (SampleBox | null)[]
+): LineStyle[] {
+  return slide.lines.map((line, i) => {
+    if (line.color) return manualLineStyle(line.color);
+    const box = boxes[i] ?? anchorBox(slide, i, line, vw, vh);
+    const region = analyzeBox(img, vw, vh, box);
+    const ny = (box.y + box.h / 2) / vh;
+    return pickLineStyle(region, scrimDarkenAt(ny));
+  });
+}
+
+function HeroTitles({
+  slide,
+  index,
+  lineStyles,
+  registerLine,
+}: {
+  slide: HeroSlide;
+  index: number;
+  lineStyles: LineStyle[];
+  registerLine: (i: number, el: HTMLSpanElement | null) => void;
+}) {
+  return (
+    <div
+      key={index}
+      className={`landing-titles landing-titles--${slide.block}`}
+      aria-hidden
+    >
+      {slide.lines.map((line, i) => (
+        <span
+          key={i}
+          ref={(el) => registerLine(i, el)}
+          className={`landing-titleline landing-titleline--${line.align} landing-titleline--from-${line.from}`}
+          style={{
+            animationDelay: `${i * 110}ms`,
+            color: lineStyles[i]?.color ?? "#ffffff",
+          }}
+        >
+          {line.text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function TriangleHero({
+  active,
+  restoreIndex,
+  onRestoreApplied,
+  onIndexChange,
+  onOpenDetails,
+}: {
+  active: boolean;
+  restoreIndex?: number | null;
+  onRestoreApplied?: () => void;
+  onIndexChange: (i: number) => void;
+  onOpenDetails: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [lineStyles, setLineStyles] = useState<LineStyle[]>(() =>
+    heroSlides[0].lines.map(() => ({ tone: "light" as TitleTone, color: "#ffffff" }))
+  );
+  const [stylesReady, setStylesReady] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<HeroEngine | null>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
+  const lineRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const draggingRef = useRef(false);
   const ripplingRef = useRef(false);
   const startXRef = useRef(0);
@@ -92,9 +561,50 @@ function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
   const lockedPeekRef = useRef<number | null>(null);
   const lastPtRef = useRef<{ x: number; y: number } | null>(null);
   const indexRef = useRef(0);
+  const activeRef = useRef(active);
 
-  const count = landingImages.length;
   indexRef.current = index;
+  activeRef.current = active;
+
+  useEffect(() => {
+    onIndexChange(index);
+  }, [index, onIndexChange]);
+
+  const registerLine = useCallback(
+    (i: number, el: HTMLSpanElement | null) => {
+      lineRefs.current[i] = el;
+    },
+    []
+  );
+
+  const applyLineStyles = useCallback((slideIdx: number) => {
+    const img = imagesRef.current[slideIdx];
+    const viewport = viewportRef.current;
+    if (!img?.complete || !viewport || viewport.clientWidth <= 0) {
+      setStylesReady(false);
+      return;
+    }
+
+    const slide = heroSlides[slideIdx];
+    if (!slide) return;
+
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    // Measure each line's real resting box so every line samples exactly the
+    // pixels behind it (no overlap between lines, no whole-block averaging).
+    const boxes = slide.lines.map((_, i) => {
+      const el = lineRefs.current[i];
+      if (!el || el.offsetWidth <= 0) return null;
+      return offsetRect(el, viewport);
+    });
+
+    setLineStyles(computeLineStyles(img, vw, vh, slide, boxes));
+    setStylesReady(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    applyLineStyles(index);
+  }, [index, applyLineStyles]);
 
   const setEngineImages = useCallback((frontIdx: number, backIdx: number) => {
     const engine = engineRef.current;
@@ -104,6 +614,37 @@ function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
     engine.backImg = imgs[backIdx];
     requestHeroPaint(engine);
   }, []);
+
+  const jumpToIndex = useCallback(
+    (target: number) => {
+      const engine = engineRef.current;
+      const imgs = imagesRef.current;
+      if (!imgs[target]) return;
+
+      if (engine) {
+        resetHeroFlips(engine);
+        engine.frontImg = imgs[target];
+        engine.backImg = imgs[wrapNext(target, count)] ?? imgs[target];
+        paintHero(engine);
+      }
+
+      setIndex(target);
+      indexRef.current = target;
+      lockedPeekRef.current = null;
+      applyLineStyles(target);
+    },
+    [applyLineStyles]
+  );
+
+  useLayoutEffect(() => {
+    if (restoreIndex == null || restoreIndex < 0 || restoreIndex >= count) return;
+    if (restoreIndex === indexRef.current) {
+      onRestoreApplied?.();
+      return;
+    }
+    jumpToIndex(restoreIndex);
+    onRestoreApplied?.();
+  }, [restoreIndex, jumpToIndex, onRestoreApplied]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -115,18 +656,20 @@ function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
     const onResize = () => {
       resizeHeroEngine(engine);
       paintHero(engine);
+      applyLineStyles(indexRef.current);
     };
 
     onResize();
     const ro = new ResizeObserver(onResize);
     if (viewportRef.current) ro.observe(viewportRef.current);
 
-    Promise.all(landingImages.map((img) => loadHeroImage(img.src)))
+    Promise.all(heroSlides.map((s) => loadHeroImage(s.src, s.hue)))
       .then((imgs) => {
         imagesRef.current = imgs;
         engine.frontImg = imgs[0];
         engine.backImg = imgs[wrapNext(0, count)];
         paintHero(engine);
+        applyLineStyles(0);
       })
       .catch(() => undefined);
 
@@ -135,7 +678,8 @@ function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
       if (engine.raf) cancelAnimationFrame(engine.raf);
       engineRef.current = null;
     };
-  }, [count]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const lockPeekDirection = useCallback(
     (dx: number, dy: number) => {
@@ -166,68 +710,58 @@ function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
       lockedPeekRef.current = target;
       setEngineImages(indexRef.current, target);
     },
-    [count, setEngineImages]
+    [setEngineImages]
   );
 
-  const runRipple = useCallback(
-    (targetIndex: number) => {
-      const engine = engineRef.current;
-      if (!engine || ripplingRef.current) return;
+  const runRipple = useCallback((targetIndex: number) => {
+    const engine = engineRef.current;
+    if (!engine || ripplingRef.current) return;
 
-      ripplingRef.current = true;
-      engine.backImg = imagesRef.current[targetIndex] ?? engine.backImg;
+    ripplingRef.current = true;
+    setTransitioning(true);
+    engine.backImg = imagesRef.current[targetIndex] ?? engine.backImg;
 
-      const seeds = collectRippleSeeds(engine);
-      startHeroRipple(engine, seeds, () => {
-        resetHeroFlips(engine);
-        setIndex(targetIndex);
-        indexRef.current = targetIndex;
-        lockedPeekRef.current = null;
-        engine.frontImg = imagesRef.current[targetIndex] ?? engine.frontImg;
-        engine.backImg =
-          imagesRef.current[wrapNext(targetIndex, count)] ?? engine.backImg;
-        paintHero(engine);
-        ripplingRef.current = false;
-        draggingRef.current = false;
-        setDragging(false);
-        dragXRef.current = 0;
-        dragYRef.current = 0;
-        lastPtRef.current = null;
-      });
-    },
-    [count]
-  );
+    const seeds = collectRippleSeeds(engine);
+    startHeroRipple(engine, seeds, () => {
+      resetHeroFlips(engine);
+      setIndex(targetIndex);
+      indexRef.current = targetIndex;
+      lockedPeekRef.current = null;
+      engine.frontImg = imagesRef.current[targetIndex] ?? engine.frontImg;
+      engine.backImg =
+        imagesRef.current[wrapNext(targetIndex, count)] ?? engine.backImg;
+      paintHero(engine);
+      ripplingRef.current = false;
+      draggingRef.current = false;
+      setDragging(false);
+      setTransitioning(false);
+      dragXRef.current = 0;
+      dragYRef.current = 0;
+      lastPtRef.current = null;
+    });
+  }, []);
 
-  const brushAt = useCallback(
-    (clientX: number, clientY: number) => {
-      const el = viewportRef.current;
-      const engine = engineRef.current;
-      if (!el || !engine) return;
+  const brushAt = useCallback((clientX: number, clientY: number) => {
+    const el = viewportRef.current;
+    const engine = engineRef.current;
+    if (!el || !engine) return;
 
-      const rect = el.getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
+    const rect = el.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-      if (lastPtRef.current) {
-        markHeroStroke(
-          engine,
-          lastPtRef.current.x,
-          lastPtRef.current.y,
-          x,
-          y
-        );
-      } else {
-        const idx = hitTestTriangle(engine, x, y);
-        if (idx >= 0) markHeroTile(engine, idx);
-      }
+    if (lastPtRef.current) {
+      markHeroStroke(engine, lastPtRef.current.x, lastPtRef.current.y, x, y);
+    } else {
+      const idx = hitTestTriangle(engine, x, y);
+      if (idx >= 0) markHeroTile(engine, idx);
+    }
 
-      lastPtRef.current = { x, y };
-    },
-    []
-  );
+    lastPtRef.current = { x, y };
+  }, []);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (ripplingRef.current) return;
+    if (!activeRef.current || ripplingRef.current) return;
     const engine = engineRef.current;
     if (!engine) return;
 
@@ -284,115 +818,365 @@ function TriangleHero({ onLoginClick }: { onLoginClick: () => void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (ripplingRef.current) return;
+      if (!activeRef.current || ripplingRef.current) return;
       if (e.key === "ArrowRight") runRipple(wrapNext(indexRef.current, count));
       if (e.key === "ArrowLeft") runRipple(wrapPrev(indexRef.current, count));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [count, runRipple]);
+  }, [runRipple]);
+
+  const slide = heroSlides[index];
 
   return (
-    <section className="landing-hero">
-      <div
-        ref={viewportRef}
-        className={`landing-hero__viewport${dragging ? " landing-hero__viewport--dragging" : ""}`}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
-        <canvas ref={canvasRef} className="landing-tri-canvas" aria-hidden />
-        <div className="landing-hero__scrim" />
+    <div
+      ref={viewportRef}
+      className={`landing-hero__viewport${dragging ? " landing-hero__viewport--dragging" : ""}`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <canvas ref={canvasRef} className="landing-tri-canvas" aria-hidden />
+      <div className="landing-hero__scrim" />
 
-        <div className="landing-hero__content">
-          <h1 className="landing-hero__title">
-            <span className="landing-word landing-word--in-left">Find</span>{" "}
-            <span className="landing-word landing-word--in-right">your</span>{" "}
-            <span className="landing-word landing-word--in-up">people.</span>
-          </h1>
-          <p className="landing-hero__subtitle">
-            Chat, build private circles, and grow communities that keep people
-            coming back.
-          </p>
-          <div className="landing-hero__actions">
-            <Link to="/register" className="landing-btn landing-btn--primary">
-              Create your account
-              <ArrowRight size={18} className="ml-2" />
-            </Link>
-            <button
-              type="button"
-              onClick={onLoginClick}
-              className="landing-btn landing-btn--ghost"
-            >
-              Log in
-            </button>
-          </div>
-        </div>
+      <div
+        className={`landing-titles-wrap${!stylesReady || dragging || transitioning ? " is-hidden" : ""}`}
+      >
+        <HeroTitles
+          slide={slide}
+          index={index}
+          lineStyles={lineStyles}
+          registerLine={registerLine}
+        />
       </div>
-    </section>
+
+      <button
+        type="button"
+        className={`landing-cta-arrow${!stylesReady || dragging || transitioning ? " is-hidden" : ""}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={onOpenDetails}
+        aria-label="Explore details"
+      >
+        <span className="landing-cta-arrow__label">Explore</span>
+        <ArrowRight size={22} />
+      </button>
+    </div>
   );
 }
 
 export default function LandingPage({
   onLoginClick,
+  onDetailsOpenChange,
 }: {
   onLoginClick: () => void;
+  onDetailsOpenChange?: (open: boolean) => void;
 }) {
+  const [view, setView] = useState<"hero" | "details">("hero");
+  const [switchKey, setSwitchKey] = useState(0);
+  const [restoreHeroIndex, setRestoreHeroIndex] = useState<number | null>(null);
+  const sectionColors = exploreSectionCssColors;
+  const currentIndexRef = useRef(0);
+  const detailsSectionRef = useRef(0);
+  const openIndexRef = useRef(0);
+  const detailsRef = useRef<HTMLDivElement | null>(null);
+  const detailsPaneRef = useRef<HTMLDivElement | null>(null);
+  const detailsBgRef = useRef<HTMLDivElement | null>(null);
+  const lavaPaletteRef = useRef<LavaPaletteState>({
+    sectionColors: exploreSectionCssColors,
+    seg: 0,
+    slideCount: count,
+  });
+  const lavaPointerRef = useRef<LavaPointerState>({
+    x: 0.5,
+    y: 0.5,
+    smoothX: 0.5,
+    smoothY: 0.5,
+    has: false,
+  });
+  const innerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const wheelLockRef = useRef(false);
+
+  // One tall gradient — scroll pans through it so colours blend smoothly.
+  const detailsGradient = useMemo(() => {
+    if (count === 1) {
+      return `linear-gradient(to bottom, ${sectionColors[0]}, ${sectionColors[0]})`;
+    }
+    const stops = sectionColors.map((c, i) => {
+      const pct = (i / (count - 1)) * 100;
+      return `${c} ${pct.toFixed(2)}%`;
+    });
+    return `linear-gradient(to bottom, ${stops.join(", ")})`;
+  }, [sectionColors]);
+
+  const updateScrollFx = useCallback(() => {
+    const pane = detailsRef.current;
+    if (!pane) return;
+    const vh = pane.clientHeight;
+    if (vh <= 0) return;
+
+    const seg = pane.scrollTop / vh;
+    const idx = Math.round(seg);
+    detailsSectionRef.current = Math.max(0, Math.min(count - 1, idx));
+
+    const bg = detailsBgRef.current;
+    if (bg) {
+      const h = pane.scrollHeight;
+      bg.style.backgroundImage = detailsGradient;
+      bg.style.backgroundSize = `100% ${h}px`;
+      bg.style.backgroundPosition = `0 ${-pane.scrollTop}px`;
+      bg.style.backgroundRepeat = "no-repeat";
+    }
+
+    const lava = lavaPaletteRef.current;
+    lava.sectionColors = sectionColors;
+    lava.seg = seg;
+    lava.slideCount = count;
+
+    for (let i = 0; i < innerRefs.current.length; i++) {
+      const inner = innerRefs.current[i];
+      if (!inner) continue;
+      const op = sectionOpacity(seg, i, count);
+      inner.style.opacity = op.toFixed(3);
+      inner.style.visibility = op < 0.02 ? "hidden" : "visible";
+      inner.style.transform = "none";
+    }
+  }, [detailsGradient, sectionColors]);
+
+  const openDetails = useCallback(() => {
+    const idx = currentIndexRef.current;
+    openIndexRef.current = idx;
+    detailsSectionRef.current = idx;
+    setView("details");
+    setSwitchKey((k) => k + 1);
+    onDetailsOpenChange?.(true);
+  }, [onDetailsOpenChange]);
+
+  const closeDetails = useCallback(() => {
+    setRestoreHeroIndex(detailsSectionRef.current);
+    setView("hero");
+    setSwitchKey((k) => k + 1);
+    onDetailsOpenChange?.(false);
+  }, [onDetailsOpenChange]);
+
+  const handleRestoreApplied = useCallback(() => {
+    setRestoreHeroIndex(null);
+  }, []);
+
+  const handleIndexChange = useCallback((i: number) => {
+    currentIndexRef.current = i;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (view !== "details") return;
+    const pane = detailsRef.current;
+    if (!pane) return;
+    const idx = openIndexRef.current;
+    detailsSectionRef.current = idx;
+    pane.scrollTop = idx * pane.clientHeight;
+    updateScrollFx();
+  }, [view, updateScrollFx]);
+
+  useEffect(() => {
+    if (view !== "details") return;
+    updateScrollFx();
+  }, [view, sectionColors, updateScrollFx]);
+
+  useEffect(() => {
+    if (view !== "details") return;
+    const pane = detailsPaneRef.current;
+    if (!pane) return;
+
+    const updatePointer = (clientX: number, clientY: number) => {
+      const rect = pane.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const nx = (clientX - rect.left) / rect.width;
+      const ny = (clientY - rect.top) / rect.height;
+      const pointer = lavaPointerRef.current;
+      if (nx < 0 || nx > 1 || ny < 0 || ny > 1) {
+        pointer.has = false;
+        return;
+      }
+      pointer.x = nx;
+      pointer.y = ny;
+      pointer.has = true;
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      updatePointer(e.clientX, e.clientY);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      updatePointer(e.clientX, e.clientY);
+    };
+
+    const onPointerLeave = (e: PointerEvent) => {
+      if (e.relatedTarget && pane.contains(e.relatedTarget as Node)) return;
+      lavaPointerRef.current.has = false;
+    };
+
+    pane.addEventListener("pointermove", onPointerMove, {
+      capture: true,
+      passive: true,
+    });
+    pane.addEventListener("pointerleave", onPointerLeave);
+    pane.addEventListener("mousemove", onMouseMove, {
+      capture: true,
+      passive: true,
+    });
+
+    return () => {
+      pane.removeEventListener("pointermove", onPointerMove, { capture: true });
+      pane.removeEventListener("pointerleave", onPointerLeave);
+      pane.removeEventListener("mousemove", onMouseMove, { capture: true });
+      lavaPointerRef.current.has = false;
+    };
+  }, [view]);
+
+  useEffect(() => {
+    if (view !== "details") return;
+    const scroll = detailsRef.current;
+    const pane = detailsPaneRef.current;
+    if (!scroll || !pane) return;
+
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateScrollFx();
+      });
+    };
+
+    const snapTo = (target: number) => {
+      const vh = scroll.clientHeight;
+      wheelLockRef.current = true;
+      scroll.scrollTo({ top: target * vh, behavior: "smooth" });
+      window.setTimeout(() => {
+        wheelLockRef.current = false;
+      }, 560);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (wheelLockRef.current) return;
+      const vh = scroll.clientHeight;
+      if (vh <= 0) return;
+      const current = Math.round(scroll.scrollTop / vh);
+      if (e.deltaY > 8 && current < count - 1) snapTo(current + 1);
+      else if (e.deltaY < -8 && current > 0) snapTo(current - 1);
+    };
+
+    const onScrollEnd = () => {
+      wheelLockRef.current = false;
+      updateScrollFx();
+    };
+
+    scroll.addEventListener("scroll", onScroll, { passive: true });
+    scroll.addEventListener("scrollend", onScrollEnd);
+    pane.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    const ro = new ResizeObserver(() => updateScrollFx());
+    ro.observe(scroll);
+    updateScrollFx();
+    return () => {
+      scroll.removeEventListener("scroll", onScroll);
+      scroll.removeEventListener("scrollend", onScrollEnd);
+      pane.removeEventListener("wheel", onWheel, { capture: true });
+      ro.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+      wheelLockRef.current = false;
+    };
+  }, [view, updateScrollFx]);
+
+  useEffect(() => {
+    if (view !== "details") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeDetails();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, closeDetails]);
+
   return (
-    <main className="relative flex-1 overflow-hidden">
-      <TriangleHero onLoginClick={onLoginClick} />
-
-      <section className="relative border-y border-white/10 bg-white/[0.03] py-5">
-        <div className="landing-marquee landing-marquee--ltr">
-          <span>
-            real conversations · close circles · living communities · profiles
-            with personality · real conversations · close circles · living
-            communities · profiles with personality ·{" "}
-          </span>
+    <div className="landing-shell">
+      <div className={`landing-track${view === "details" ? " is-details" : ""}`}>
+        <div className="landing-pane">
+          <TriangleHero
+            active={view === "hero"}
+            restoreIndex={restoreHeroIndex}
+            onRestoreApplied={handleRestoreApplied}
+            onIndexChange={handleIndexChange}
+            onOpenDetails={openDetails}
+          />
         </div>
-      </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-20 sm:px-6 lg:grid-cols-4 lg:px-8">
-        {featureCards.map(({ icon: Icon, title, text }, i) => (
-          <div
-            key={title}
-            className="landing-rise rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl"
-            style={{ animationDelay: `${i * 120}ms` }}
+        <div ref={detailsPaneRef} className="landing-pane landing-details">
+          <button
+            type="button"
+            className="landing-back"
+            onClick={closeDetails}
+            aria-label="Back to start"
           >
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-200">
-              <Icon size={22} />
-            </div>
-            <h2 className="text-xl font-bold text-white">{title}</h2>
-            <p className="mt-3 text-sm leading-6 text-gray-400">{text}</p>
-          </div>
-        ))}
-      </section>
+            <ArrowLeft size={20} />
+            <span>Back</span>
+          </button>
 
-      <section className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-[2rem] border border-white/12 bg-gradient-to-br from-indigo-500/20 via-violet-500/10 to-white/[0.04] p-8 text-center shadow-[0_30px_120px_rgba(79,70,229,0.25)] sm:p-12">
-          <div className="absolute -left-10 top-10 h-40 w-40 rounded-full bg-indigo-500/30 blur-3xl" />
-          <div className="absolute -right-12 bottom-0 h-48 w-48 rounded-full bg-violet-500/25 blur-3xl" />
-          <div className="relative mx-auto max-w-3xl">
-            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-              <HeartHandshake size={26} className="text-indigo-100" />
-            </div>
-            <h2 className="text-4xl font-black text-white sm:text-6xl">
-              Your people are one click away.
-            </h2>
-            <p className="mt-5 text-lg leading-8 text-indigo-100/75">
-              Set up your profile, add a few friends, start a circle, and send the
-              first message while the spark is still there.
-            </p>
-            <div className="mt-8">
-              <Link to="/register" className="landing-btn landing-btn--primary mx-auto">
-                Join SebetPage
-                <ArrowRight size={18} className="ml-2" />
-              </Link>
-            </div>
+          <div className="landing-details__stage">
+            <div ref={detailsBgRef} className="landing-details__bg" aria-hidden />
+            <DetailsLavaGlow
+              active={view === "details"}
+              containerRef={detailsPaneRef}
+              paletteRef={lavaPaletteRef}
+              pointerRef={lavaPointerRef}
+            />
+            {heroSlides.map((s, i) => (
+              <div
+                key={i}
+                className="landing-section__inner"
+                ref={(el) => {
+                  innerRefs.current[i] = el;
+                }}
+              >
+                <span className="landing-section__index">
+                  {String(i + 1).padStart(2, "0")}
+                  <span className="landing-section__index-total">
+                    {" "}
+                    / {String(count).padStart(2, "0")}
+                  </span>
+                </span>
+                <h2 className="landing-section__title">{s.title}</h2>
+                <p className="landing-section__text">{s.subtitle}</p>
+
+                {i === count - 1 && (
+                  <div className="landing-section__actions">
+                    <Link to="/register" className="landing-btn landing-btn--primary">
+                      Create your account
+                      <ArrowRight size={18} className="ml-2" />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={onLoginClick}
+                      className="landing-btn landing-btn--ghost"
+                    >
+                      Log in
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="landing-details__scroll" ref={detailsRef}>
+            {heroSlides.map((_, i) => (
+              <div key={i} className="landing-details__sentinel" aria-hidden />
+            ))}
           </div>
         </div>
-      </section>
-    </main>
+      </div>
+
+      {switchKey > 0 && (
+        <div key={switchKey} className="landing-switch-veil" aria-hidden />
+      )}
+    </div>
   );
 }

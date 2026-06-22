@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fluid Gradient Background</title>
+  <style>
+    /* ─── Page shell ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #08080a;
+      color: #f0f0f2;
+    }
+
+    /* Full-bleed background stack */
+    #fluid-bg-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      /* Fallback base color (overridden by canvas) */
+      background: var(--bg-base, #12101a);
+    }
+
+    #fluid-bg-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      /*
+       * Heavy blur merges blobs into a soft fluid field.
+       * Tweak blur in CONFIG.canvasBlur below (applied via JS too).
+       */
+      filter: blur(72px) saturate(1.15);
+      transform: translateZ(0); /* promote layer for smoother compositing */
+    }
+
+    /* Demo content sits above the background */
+    .demo-content {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 2rem;
+      text-align: center;
+      pointer-events: none; /* let mouse reach canvas — remove if you need clicks */
+    }
+
+    .demo-content h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .demo-content p {
+      max-width: 32rem;
+      opacity: 0.65;
+      line-height: 1.6;
+      font-size: 1.05rem;
+    }
+
+    .demo-content .hint {
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      opacity: 0.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="fluid-bg-wrap">
+    <canvas id="fluid-bg-canvas" aria-hidden="true"></canvas>
+  </div>
+
+  <!-- Replace / remove this block in your app; keep only #fluid-bg-wrap -->
+  <div class="demo-content">
+    <h1>Fluid gradient</h1>
+    <p>
+      Move your mouse — soft tints drop into the field, spread, then melt back
+      into the ambient color. Large blobs drift on their own beneath.
+    </p>
+    <p class="hint">Open DevTools → edit CONFIG at top of script to tweak colors &amp; timing.</p>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CONFIG — tweak everything here
+    // ═══════════════════════════════════════════════════════════════════
+    const CONFIG = {
+      // ── Palette (RGB 0–255). Mouse blobs pick variants from these. ──
+      palette: {
+        base:    [18, 14, 28],    // overall wash / convergence target
+        ambient: [
+          [52, 38, 88],
+          [38, 52, 96],
+          [68, 42, 72],
+          [44, 58, 82],
+        ],
+      },
+
+      // ── Ambient lava-lamp blobs (always on screen) ──
+      ambient: {
+        count: 5,
+        minRadius: 0.28,   // fraction of min(screenW, screenH)
+        maxRadius: 0.42,
+        speed: 0.00014,    // drift speed multiplier
+        opacity: 0.55,
+      },
+
+      // ── Mouse-drop blobs ──
+      mouse: {
+        spawnIntervalMs: 48,     // throttle: min ms between new blobs
+        maxActive: 36,           // cap simultaneous mouse blobs
+        minRadius: 0.06,         // initial size (fraction of min dim)
+        maxRadius: 0.22,         // peak spread size
+        lifespanMs: 4200,        // total life before fully gone
+        spreadPhase: 0.22,       // 0–1 fraction of life spent expanding
+        // Color jitter per drop (applied on top of palette)
+        lightnessJitter: 0.18,   // ± brightness
+        hueJitter: 0.08,         // ± hue shift (0–1 scale)
+      },
+
+      // ── Canvas / blur ──
+      canvasBlur: 72,            // px — also mirrored in CSS above
+      trailFade: 0.028,          // ambient persistence per frame (lower = longer trails)
+      dprCap: 2,
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  DOM
+    // ═══════════════════════════════════════════════════════════════════
+    const wrap   = document.getElementById("fluid-bg-wrap");
+    const canvas = document.getElementById("fluid-bg-canvas");
+    const ctx    = canvas.getContext("2d", { alpha: true });
+
+    canvas.style.filter = `blur(${CONFIG.canvasBlur}px) saturate(1.15)`;
+    wrap.style.setProperty("--bg-base", rgbCss(CONFIG.palette.base));
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════════════
+    function rgbCss(c, a = 1) {
+      return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+    }
+
+    /** Smooth ease-in-out (organic motion, not linear). */
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function easeOutQuad(t) {
+      return 1 - (1 - t) * (1 - t);
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function lerpColor(a, b, t) {
+      return [
+        lerp(a[0], b[0], t),
+        lerp(a[1], b[1], t),
+        lerp(a[2], b[2], t),
+      ];
+    }
+
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
+    }
+
+    /** Pick a mouse blob color: palette variant ± jitter. */
+    function randomDropColor() {
+      const pool = CONFIG.palette.ambient;
+      const base = pool[Math.floor(Math.random() * pool.length)];
+      const lj = CONFIG.mouse.lightnessJitter;
+      const hj = CONFIG.mouse.hueJitter;
+      const factor = 1 + (Math.random() * 2 - 1) * lj;
+      // simple RGB jitter (good enough for soft blobs)
+      const hueShift = (Math.random() * 2 - 1) * hj * 40;
+      return [
+        clamp(base[0] * factor + hueShift, 0, 255),
+        clamp(base[1] * factor - hueShift * 0.3, 0, 255),
+        clamp(base[2] * factor + hueShift * 0.5, 0, 255),
+      ];
+    }
+
+    function minDim() {
+      return Math.min(state.w, state.h);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════════════════════
+    const state = {
+      w: 0,
+      h: 0,
+      dpr: 1,
+      mouseX: 0.5,
+      mouseY: 0.5,
+      hasMouse: false,
+      lastSpawn: 0,
+      ambient: [],   // { x, y, vx, vy, r, color, phase }
+      drops: [],     // mouse blobs
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Ambient blob factory
+    // ═══════════════════════════════════════════════════════════════════
+    function initAmbient() {
+      state.ambient = [];
+      const md = minDim();
+      for (let i = 0; i < CONFIG.ambient.count; i++) {
+        const colors = CONFIG.palette.ambient;
+        const ang = Math.random() * Math.PI * 2;
+        const spd = CONFIG.ambient.speed * md * (0.6 + Math.random() * 0.8);
+        state.ambient.push({
+          x: Math.random(),
+          y: Math.random(),
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          r: lerp(CONFIG.ambient.minRadius, CONFIG.ambient.maxRadius, Math.random()) * md,
+          color: colors[i % colors.length],
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+
+    function resize() {
+      state.dpr = Math.min(window.devicePixelRatio || 1, CONFIG.dprCap);
+      state.w = wrap.clientWidth;
+      state.h = wrap.clientHeight;
+      canvas.width  = Math.max(1, Math.floor(state.w * state.dpr));
+      canvas.height = Math.max(1, Math.floor(state.h * state.dpr));
+      canvas.style.width  = state.w + "px";
+      canvas.style.height = state.h + "px";
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+      if (state.ambient.length === 0) initAmbient();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Mouse blob
+    // ═══════════════════════════════════════════════════════════════════
+    function spawnDrop(nx, ny) {
+      if (state.drops.length >= CONFIG.mouse.maxActive) {
+        state.drops.shift(); // drop oldest
+      }
+      const md = minDim();
+      state.drops.push({
+        x: nx,
+        y: ny,
+        born: performance.now(),
+        color: randomDropColor(),
+        target: CONFIG.palette.base,
+        minR: CONFIG.mouse.minRadius * md,
+        maxR: CONFIG.mouse.maxRadius * md * (0.75 + Math.random() * 0.5),
+        lifespan: CONFIG.mouse.lifespanMs * (0.85 + Math.random() * 0.3),
+      });
+    }
+
+    /**
+     * Blob lifecycle:
+     *  1. spread  — radius grows (ease out)
+     *  2. shrink  — radius shrinks, color → base, alpha → 0
+     */
+    function dropVisual(drop, now) {
+      const age = now - drop.born;
+      const t = clamp(age / drop.lifespan, 0, 1);
+      const spreadEnd = CONFIG.mouse.spreadPhase;
+
+      let radius, alpha, color;
+
+      if (t < spreadEnd) {
+        const p = easeOutQuad(t / spreadEnd);
+        radius = lerp(drop.minR, drop.maxR, p);
+        alpha = lerp(0.15, 0.55, p);
+        color = drop.color;
+      } else {
+        const p = easeInOutCubic((t - spreadEnd) / (1 - spreadEnd));
+        radius = lerp(drop.maxR, drop.minR * 0.4, p);
+        alpha = lerp(0.5, 0, p);
+        color = lerpColor(drop.color, drop.target, p);
+      }
+
+      return { radius, alpha: alpha * (1 - t * 0.15), color };
+    }
+
+    function drawBlob(px, py, radius, color, alpha) {
+      if (alpha < 0.004 || radius < 1) return;
+      const g = ctx.createRadialGradient(px, py, 0, px, py, radius);
+      g.addColorStop(0,    rgbCss(color, alpha * 0.95));
+      g.addColorStop(0.35, rgbCss(color, alpha * 0.55));
+      g.addColorStop(0.7,  rgbCss(color, alpha * 0.18));
+      g.addColorStop(1,    rgbCss(color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Input
+    // ═══════════════════════════════════════════════════════════════════
+    function onPointerMove(e) {
+      const rect = wrap.getBoundingClientRect();
+      state.mouseX = (e.clientX - rect.left) / rect.width;
+      state.mouseY = (e.clientY - rect.top) / rect.height;
+      state.hasMouse = true;
+
+      const now = performance.now();
+      if (now - state.lastSpawn >= CONFIG.mouse.spawnIntervalMs) {
+        state.lastSpawn = now;
+        spawnDrop(state.mouseX, state.mouseY);
+      }
+    }
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("resize", resize);
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Main loop
+    // ═══════════════════════════════════════════════════════════════════
+    let rafId = 0;
+
+    function tick(now) {
+      rafId = requestAnimationFrame(tick);
+      if (state.w <= 0 || state.h <= 0) return;
+
+      const w = state.w;
+      const h = state.h;
+      const md = minDim();
+      const t = now * 0.001;
+
+      // ── Slow persistence fade (fluid trail memory) ──
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = rgbCss(CONFIG.palette.base, CONFIG.trailFade);
+      ctx.fillRect(0, 0, w, h);
+
+      // ── Ambient lava-lamp blobs ──
+      for (const a of state.ambient) {
+        a.x += a.vx / w;
+        a.y += a.vy / h;
+        // gentle wobble
+        const wx = Math.sin(t * 0.35 + a.phase) * 0.0003;
+        const wy = Math.cos(t * 0.28 + a.phase * 1.3) * 0.0003;
+        a.x += wx;
+        a.y += wy;
+        // wrap
+        if (a.x < -0.15) a.x = 1.15;
+        if (a.x > 1.15)  a.x = -0.15;
+        if (a.y < -0.15) a.y = 1.15;
+        if (a.y > 1.15)  a.y = -0.15;
+
+        const breathe = 1 + Math.sin(t * 0.5 + a.phase) * 0.08;
+        drawBlob(
+          a.x * w,
+          a.y * h,
+          a.r * breathe,
+          a.color,
+          CONFIG.ambient.opacity
+        );
+      }
+
+      // ── Mouse drops ──
+      ctx.globalCompositeOperation = "lighter"; // soft color mixing
+      state.drops = state.drops.filter((d) => now - d.born < d.lifespan);
+      for (const d of state.drops) {
+        const v = dropVisual(d, now);
+        drawBlob(d.x * w, d.y * h, v.radius, v.color, v.alpha);
+      }
+      ctx.globalCompositeOperation = "source-over";
+
+      // ── Base wash so field never fully empties ──
+      ctx.fillStyle = rgbCss(CONFIG.palette.base, 0.04);
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    resize();
+    rafId = requestAnimationFrame(tick);
+
+    // Cleanup if embedded in SPA (optional)
+    window.FluidGradientBg = {
+      destroy() {
+        cancelAnimationFrame(rafId);
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("resize", resize);
+      },
+      CONFIG,
+    };
+  })();
+  </script>
+</body>
+</html>

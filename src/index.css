@@ -256,8 +256,8 @@ body::after {
 
 .landing-hero__viewport {
   position: relative;
-  height: 100svh;
-  min-height: 100svh;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
   touch-action: none;
   user-select: none;
@@ -288,90 +288,192 @@ body::after {
     linear-gradient(to top, rgba(8, 8, 10, 0.92), rgba(8, 8, 10, 0.25) 45%, rgba(8, 8, 10, 0.55));
 }
 
-.landing-hero__content {
+/* ---- Landing shell + horizontal view switch ---- */
+.landing-shell {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+  background-color: #08080a;
+}
+
+.landing-track {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transform: translateX(0);
+  transition: transform 620ms cubic-bezier(0.76, 0, 0.24, 1);
+  will-change: transform;
+}
+
+.landing-track.is-details {
+  transform: translateX(-50%);
+}
+
+.landing-pane {
+  position: relative;
+  flex: 0 0 50%;
+  width: 50%;
+  height: 100%;
+}
+
+/* ---- Hero per-slide animated titles ---- */
+.landing-titles-wrap {
   position: absolute;
   inset: 0;
   z-index: 3;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 360ms ease;
+}
+
+.landing-titles-wrap.is-hidden {
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.landing-titles {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  padding: clamp(5.5rem, 13vh, 9rem) clamp(1.25rem, 6vw, 5rem)
+    clamp(5rem, 13vh, 8rem);
+}
+
+.landing-titles--top {
+  justify-content: flex-start;
+}
+.landing-titles--center {
   justify-content: center;
-  text-align: center;
-  padding: 1.5rem;
-  pointer-events: none;
+}
+.landing-titles--bottom {
+  justify-content: flex-end;
+}
+.landing-titles--between {
+  justify-content: space-between;
 }
 
-.landing-hero__content > * {
-  pointer-events: none;
-}
-
-.landing-hero__actions a,
-.landing-hero__actions button,
-.landing-hero__dots button {
-  pointer-events: auto;
-}
-
-.landing-hero__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(8, 8, 10, 0.55);
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-  color: #c7d2fe;
-  backdrop-filter: blur(12px);
-  animation: landingRise 700ms ease both;
-}
-
-.landing-hero__title {
-  margin-top: 1.25rem;
+.landing-titleline {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  overflow: visible;
   font-weight: 900;
   letter-spacing: -0.02em;
-  line-height: 0.95;
+  line-height: 1.02;
+  font-size: clamp(2.6rem, 10vw, 8rem);
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.32);
+}
+
+.landing-titleline--left {
+  text-align: left;
+  margin-right: auto;
+}
+.landing-titleline--center {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+.landing-titleline--right {
+  text-align: right;
+  margin-left: auto;
+}
+
+.landing-titleline--from-left {
+  animation: landingTitleLeft 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.landing-titleline--from-right {
+  animation: landingTitleRight 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.landing-titleline--from-top {
+  animation: landingTitleTop 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.landing-titleline--from-bottom {
+  animation: landingTitleBottom 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes landingTitleLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-2.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes landingTitleRight {
+  from {
+    opacity: 0;
+    transform: translateX(2.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes landingTitleTop {
+  from {
+    opacity: 0;
+    transform: translateY(-2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes landingTitleBottom {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- Hero CTA arrow (bottom-right, opens details) ---- */
+.landing-cta-arrow {
+  position: absolute;
+  right: clamp(1.25rem, 4vw, 3rem);
+  bottom: clamp(1.25rem, 4vw, 3rem);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(8, 8, 10, 0.5);
   color: #fff;
-  font-size: clamp(2.75rem, 9vw, 6.5rem);
-  text-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 1;
+  /* Returns after the titles have animated in (delayed fade-in). */
+  transition: opacity 460ms ease 420ms, transform 0.2s ease,
+    background 0.2s ease;
 }
 
-.landing-word {
-  display: inline-block;
+.landing-cta-arrow.is-hidden {
   opacity: 0;
+  pointer-events: none;
+  /* Dims out immediately when a slide change starts. */
+  transition: opacity 240ms ease 0ms;
 }
 
-.landing-word--in-left {
-  animation: landingWordInLeft 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms forwards;
+.landing-cta-arrow:hover {
+  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.14);
 }
 
-.landing-word--in-right {
-  animation: landingWordInRight 700ms cubic-bezier(0.22, 1, 0.36, 1) 260ms forwards;
-}
-
-.landing-word--in-up {
-  background: linear-gradient(120deg, #a5b4fc, #c4b5fd, #818cf8);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: landingWordInUp 700ms cubic-bezier(0.22, 1, 0.36, 1) 400ms forwards;
-}
-
-.landing-hero__subtitle {
-  margin-top: 1.25rem;
-  max-width: 40rem;
-  font-size: clamp(1rem, 2.4vw, 1.25rem);
-  line-height: 1.7;
-  color: rgba(226, 232, 240, 0.82);
-  animation: landingRise 800ms ease 220ms both;
-}
-
-.landing-hero__actions {
-  margin-top: 2rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
-  animation: landingRise 800ms ease 320ms both;
+.landing-cta-arrow__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 .landing-btn {
@@ -406,37 +508,206 @@ body::after {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.landing-hero__hint {
-  margin-top: 1.5rem;
+/* ---- Details pane (scrollable explanations) ---- */
+.landing-details {
+  overflow: hidden;
+}
+
+.landing-details__scroll {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  opacity: 0;
+}
+
+.landing-details__sentinel {
+  height: 100svh;
+  pointer-events: none;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.landing-details__stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-details__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: #08080a;
+  background-repeat: no-repeat;
+  will-change: background-position;
+}
+
+/* ---- Fluid gradient background (Explore pane) ---- */
+.landing-details__fluid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 700ms cubic-bezier(0.215, 0.61, 0.355, 1),
+    visibility 700ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.landing-details__fluid.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.landing-details__fluid-base {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  mix-blend-mode: normal;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  will-change: background-image, background-color;
+}
+
+.landing-details__fluid-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  opacity: 0.9;
+  transform: translateZ(0);
+  contain: strict;
+}
+
+.landing-section__inner {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 46rem;
+  margin: 0 clamp(1.25rem, 8vw, 7rem);
+  padding: 2rem 0;
+  opacity: 0;
+  will-change: opacity;
+  pointer-events: none;
+}
+
+.landing-section__inner .landing-section__actions a,
+.landing-section__inner .landing-section__actions button {
+  pointer-events: auto;
+}
+
+.landing-section__index {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #c4d0ff;
+}
+
+.landing-section__index-total {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.landing-section__title {
+  margin-top: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: #ffffff;
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.35);
+}
+
+.landing-section__text {
+  margin-top: 1.25rem;
+  font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+  line-height: 1.7;
+  color: rgba(248, 250, 252, 0.96);
+  text-shadow: 0 1px 18px rgba(0, 0, 0, 0.28);
+}
+
+.landing-section__actions {
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* ---- Back-to-hero arrow (top-left of details) ---- */
+.landing-back {
+  position: absolute;
+  top: clamp(1.25rem, 4vw, 2.25rem);
+  left: clamp(1.25rem, 4vw, 2.25rem);
+  z-index: 20;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8rem;
-  color: rgba(226, 232, 240, 0.6);
-  animation: landingRise 800ms ease 420ms both;
-}
-
-.landing-hero__dots {
-  position: absolute;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  gap: 0.5rem;
-}
-
-.landing-dot {
-  height: 0.45rem;
-  width: 0.9rem;
+  padding: 0.6rem 1rem;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.35);
-  transition: all 0.25s ease;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(8, 8, 10, 0.55);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.landing-dot--active {
-  width: 2rem;
-  background: #fff;
+.landing-back:hover {
+  transform: translateX(-3px);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Brief dim that masks the bright↔dark clash while the panes slide across. */
+.landing-switch-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: #08080a;
+  opacity: 0;
+  animation: landingSwitchVeil 660ms ease both;
+}
+
+@keyframes landingSwitchVeil {
+  0% {
+    opacity: 0;
+  }
+  42% {
+    opacity: 0.62;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-track,
+  .landing-titleline--from-left,
+  .landing-titleline--from-right,
+  .landing-titleline--from-top,
+  .landing-titleline--from-bottom,
+  .landing-switch-veil {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .landing-marquee {
