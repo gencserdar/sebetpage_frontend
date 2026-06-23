@@ -3,7 +3,15 @@
  * Index 0 = section 1 … 6 = section 7.
  */
 
-import type { FluidPalette, Rgb255 } from "./fluidGradientEngine";
+export type Rgb255 = [number, number, number];
+
+export interface FluidPalette {
+  base: Rgb255;
+  scroll: Rgb255;
+  ambient: Rgb255[];
+  trail: Rgb255[];
+  blobs: Rgb255[];
+}
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -279,24 +287,30 @@ export function sampleLocalVisual(p: FluidPalette, nx: number, ny: number): Rgb2
 }
 
 /**
- * Deposit tone from local visual — darker on light bg, lighter on dark bg.
+ * Deposit tone — palette-locked contrast vs local background.
  */
 export function pickPaintPigment(
-  _palette: FluidPalette,
+  palette: FluidPalette,
   background: Rgb255,
   _paint: Rgb255 | null,
   _paintAlpha: number,
   _nx: number,
   _ny: number,
-  _trailSorted?: {
+  trailSorted?: {
     lightest: Rgb255;
     darkest: Rgb255;
     mid: Rgb255;
   } | null
 ): Rgb255 {
-  const lum = luminance(background);
-  const shift = lum > 0.52 ? -0.1 : lum < 0.48 ? 0.1 : (0.5 - lum) * 0.24;
-  return softenRgb(shiftLuminance(background, shift), 0.04);
+  const bgLum = luminance(background);
+  const light = trailSorted?.lightest ?? palette.trail[0] ?? palette.scroll;
+  const dark = trailSorted?.darkest ?? palette.base;
+  const counterBlend = bgLum > 0.5 ? 0.62 : 0.56;
+  const counter =
+    bgLum > 0.5
+      ? lerpRgb(background, dark, counterBlend)
+      : lerpRgb(background, light, counterBlend);
+  return softenRgb(counter, 0.04);
 }
 
 /** Patreon-style layered wash — positions fixed, hues from section palette. */

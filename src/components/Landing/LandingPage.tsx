@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -27,10 +26,10 @@ import {
   wrapPrev,
   type HeroEngine,
 } from "./triangleHeroEngine";
-import DetailsLavaGlow, {
+import ExploreFluidGradient, {
   type LavaPaletteState,
   type LavaPointerState,
-} from "./DetailsLavaGlow";
+} from "./fluidGradient/ExploreFluidGradient";
 import {
   EXPLORE_SECTION_PALETTES,
   paletteToCssBase,
@@ -881,7 +880,6 @@ export default function LandingPage({
   const openIndexRef = useRef(0);
   const detailsRef = useRef<HTMLDivElement | null>(null);
   const detailsPaneRef = useRef<HTMLDivElement | null>(null);
-  const detailsBgRef = useRef<HTMLDivElement | null>(null);
   const lavaPaletteRef = useRef<LavaPaletteState>({
     sectionColors: exploreSectionCssColors,
     seg: 0,
@@ -897,18 +895,6 @@ export default function LandingPage({
   const innerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const wheelLockRef = useRef(false);
 
-  // One tall gradient — scroll pans through it so colours blend smoothly.
-  const detailsGradient = useMemo(() => {
-    if (count === 1) {
-      return `linear-gradient(to bottom, ${sectionColors[0]}, ${sectionColors[0]})`;
-    }
-    const stops = sectionColors.map((c, i) => {
-      const pct = (i / (count - 1)) * 100;
-      return `${c} ${pct.toFixed(2)}%`;
-    });
-    return `linear-gradient(to bottom, ${stops.join(", ")})`;
-  }, [sectionColors]);
-
   const updateScrollFx = useCallback(() => {
     const pane = detailsRef.current;
     if (!pane) return;
@@ -918,15 +904,6 @@ export default function LandingPage({
     const seg = pane.scrollTop / vh;
     const idx = Math.round(seg);
     detailsSectionRef.current = Math.max(0, Math.min(count - 1, idx));
-
-    const bg = detailsBgRef.current;
-    if (bg) {
-      const h = pane.scrollHeight;
-      bg.style.backgroundImage = detailsGradient;
-      bg.style.backgroundSize = `100% ${h}px`;
-      bg.style.backgroundPosition = `0 ${-pane.scrollTop}px`;
-      bg.style.backgroundRepeat = "no-repeat";
-    }
 
     const lava = lavaPaletteRef.current;
     lava.sectionColors = sectionColors;
@@ -941,7 +918,7 @@ export default function LandingPage({
       inner.style.visibility = op < 0.02 ? "hidden" : "visible";
       inner.style.transform = "none";
     }
-  }, [detailsGradient, sectionColors]);
+  }, [sectionColors]);
 
   const openDetails = useCallback(() => {
     const idx = currentIndexRef.current;
@@ -1122,8 +1099,7 @@ export default function LandingPage({
           </button>
 
           <div className="landing-details__stage">
-            <div ref={detailsBgRef} className="landing-details__bg" aria-hidden />
-            <DetailsLavaGlow
+            <ExploreFluidGradient
               active={view === "details"}
               containerRef={detailsPaneRef}
               paletteRef={lavaPaletteRef}

@@ -540,20 +540,11 @@ body::after {
   pointer-events: none;
 }
 
-.landing-details__bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-color: #08080a;
-  background-repeat: no-repeat;
-  will-change: background-position;
-}
-
-/* ---- Fluid gradient background (Explore pane) ---- */
+/* ---- Codegrid fluid gradient (Explore pane) ---- */
 .landing-details__fluid {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
   overflow: hidden;
   opacity: 0;
@@ -568,28 +559,14 @@ body::after {
   visibility: visible;
 }
 
-.landing-details__fluid-base {
-  position: absolute;
-  inset: 0;
-  opacity: 1;
-  mix-blend-mode: normal;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center;
-  will-change: background-image, background-color;
-}
-
-.landing-details__fluid-canvas {
+.landing-details__gradient-canvas {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  mix-blend-mode: soft-light;
-  opacity: 0.9;
   transform: translateZ(0);
-  contain: strict;
 }
 
 .landing-section__inner {
