@@ -44,7 +44,7 @@ export const DEFAULT_FLUID_GRADIENT_CONFIG: FluidGradientConfig = {
   color2: "#6e3466",
   color3: "#0133ff",
   color4: "#66d1fe",
-  colorIntensity: 0.6,
+  colorIntensity: 0.7,
   softness: 1.0,
   blur: 2.0,
 };

@@ -30,6 +30,7 @@ import ExploreFluidGradient, {
   type LavaPaletteState,
   type LavaPointerState,
 } from "./fluidGradient/ExploreFluidGradient";
+import ExploreCommunitySearch from "./ExploreCommunitySearch";
 import {
   EXPLORE_SECTION_PALETTES,
   paletteToCssBase,
@@ -67,7 +68,7 @@ const heroSlides: HeroSlide[] = [
     hue: 250,
     title: "Find your people.",
     subtitle:
-      "Create communities around your interests and grow meaningful connections.",
+      "Build your circle around shared interests. Discover public communities for hobbies, local meetups, creative projects, and everyday conversations—or create your own when nothing quite fits. Search open spaces on the right, explore what each group is about, and step into a room that makes you feel warm.",
     block: "center",
     lines: [
       { text: "Find your", from: "left", align: "left", color: "#FFDB58" },
@@ -77,25 +78,25 @@ const heroSlides: HeroSlide[] = [
   {
     src: img("1492684223066-81342ee5ff30"),
     hue: 330,
-    title: "Make plans happen.",
+    title: "Share Your moment.",
     subtitle:
-      "Create events, invite friends, and organize unforgettable experiences together.",
+      "Post photos, videos, and updates that keep your memories alive.",
     block: "between",
     lines: [
-      { text: "Make plans", from: "left", align: "left", color : "#697CF5" },
-      { text: "happen.", from: "right", align: "right" },
+      { text: "Share", from: "bottom", align: "center", color : "#697CF5" },
+      { text: "your moment.", from: "top", align: "center" },
     ],
   },
   {
     src: img("1516450360452-9312f5e86fc7"),
     hue: 200,
-    title: "Share Your moment.",
+    title: "Make plans happen.",
     subtitle:
-      "Post photos, videos, and updates that keep your memories alive.",
+      "Create events, invite friends, and organize unforgettable experiences together.",
     block: "top",
     lines: [
-      { text: "Share", from: "top", align: "center", color: "#BD69F5" },
-      { text: "your moments.", from: "top", align: "center", color: "#ffffff" },
+      { text: "Make plans", from: "top", align: "left", color: "#BD69F5" },
+      { text: "happen.", from: "bottom", align: "right", color: "#ffffff" },
     ],
   },
   {
@@ -106,7 +107,7 @@ const heroSlides: HeroSlide[] = [
       "Jump into voice rooms and stay connected, whether you're gaming, studying, or just hanging out.",
     block: "bottom",
     lines: [
-      { text: "Talk like", from: "right", align: "right" },
+      { text: "Talk like", from: "right", align: "right", color: "#899499" },
       { text: "you're there.", from: "right", align: "right" },
     ],
   },
@@ -941,6 +942,35 @@ export default function LandingPage({
       const inner = innerRefs.current[i];
       if (!inner) continue;
       const motion = sectionMotion(seg, i);
+
+      if (inner.classList.contains("landing-section__inner--discover")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const searchX = (-motion.x).toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const copy = inner.querySelector<HTMLElement>(".landing-section__copy");
+        const search = inner.querySelector<HTMLElement>(
+          ".landing-section__community-search"
+        );
+
+        if (copy) {
+          copy.style.opacity = opacity;
+          copy.style.visibility = visibility;
+          copy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (search) {
+          search.style.opacity = opacity;
+          search.style.visibility = visibility;
+          search.style.transform = `translate3d(${searchX}%, 0, 0)`;
+        }
+        continue;
+      }
+
       inner.style.opacity = motion.opacity.toFixed(3);
       inner.style.visibility = motion.visible ? "visible" : "hidden";
       inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
@@ -1220,13 +1250,19 @@ export default function LandingPage({
             {heroSlides.map((s, i) => (
               <div
                 key={i}
-                className="landing-section__inner"
+                className={`landing-section__inner${
+                  i === 0 ? " landing-section__inner--discover" : ""
+                }`}
                 ref={(el) => {
                   innerRefs.current[i] = el;
                 }}
               >
-                <h2 className="landing-section__title">{s.title}</h2>
-                <p className="landing-section__text">{s.subtitle}</p>
+                <div className={i === 0 ? "landing-section__copy" : undefined}>
+                  <h2 className="landing-section__title">{s.title}</h2>
+                  <p className="landing-section__text">{s.subtitle}</p>
+                </div>
+
+                {i === 0 && <ExploreCommunitySearch />}
 
                 {i === count - 1 && (
                   <div className="landing-section__actions">
