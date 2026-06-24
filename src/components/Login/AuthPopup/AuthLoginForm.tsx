@@ -3,6 +3,7 @@ interface AuthLoginFormProps {
   password: string;
   rememberMe: boolean;
   error: string | null;
+  loading: boolean;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onRememberMeChange: (value: boolean) => void;
@@ -15,6 +16,7 @@ export default function AuthLoginForm({
   password,
   rememberMe,
   error,
+  loading,
   onEmailChange,
   onPasswordChange,
   onRememberMeChange,
@@ -36,23 +38,26 @@ export default function AuthLoginForm({
           placeholder="Email"
           required
           value={email}
+          disabled={loading}
           onChange={(e) => onEmailChange(e.target.value)}
-          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-60"
         />
         <input
           type="password"
           placeholder="Password"
           required
           value={password}
+          disabled={loading}
           onChange={(e) => onPasswordChange(e.target.value)}
-          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          className="w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         <div className="text-right">
           <button
             type="button"
             onClick={onForgotPassword}
-            className="text-sm text-indigo-400 hover:text-indigo-300 transition underline"
+            disabled={loading}
+            className="text-sm text-indigo-400 hover:text-indigo-300 transition underline disabled:cursor-not-allowed disabled:opacity-60"
           >
             Forgot Password?
           </button>
@@ -74,17 +79,26 @@ export default function AuthLoginForm({
           <input
             type="checkbox"
             checked={rememberMe}
+            disabled={loading}
             onChange={(e) => onRememberMeChange(e.target.checked)}
-            className="mr-2 accent-indigo-500"
+            className="mr-2 accent-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <span>Remember me</span>
         </label>
 
         <button
           type="submit"
-          className="w-full py-2 rounded-md bg-indigo-500 hover:bg-indigo-600 transition font-medium"
+          disabled={loading}
+          className="w-full py-2 rounded-md bg-indigo-500 hover:bg-indigo-600 transition font-medium disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-indigo-500 flex items-center justify-center gap-2 min-h-[2.5rem]"
         >
-          Log in
+          {loading ? (
+            <div
+              className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+              aria-hidden
+            />
+          ) : (
+            "Log in"
+          )}
         </button>
 
         <div className="flex items-center my-4">

@@ -35,6 +35,7 @@ export default function AuthPopup({ initialMode, onSubmit, onClose }: AuthPopupP
             password={form.password}
             rememberMe={form.rememberMe}
             error={form.error}
+            loading={form.loading}
             onEmailChange={form.setEmail}
             onPasswordChange={form.setPassword}
             onRememberMeChange={form.setRememberMe}

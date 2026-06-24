@@ -16,6 +16,7 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [showResetPopup, setShowResetPopup] = useState(false);
   const [showActivationPopup, setShowActivationPopup] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const { login, forgotPassword } = useUser();
 
@@ -25,7 +26,10 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setError(null);
+    setLoading(true);
 
     try {
       let success = false;
@@ -50,6 +54,8 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
         return;
       }
       setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -69,6 +75,7 @@ export function useAuthForm({ initialMode, onSubmit }: UseAuthFormParams) {
     setShowResetPopup,
     showActivationPopup,
     setShowActivationPopup,
+    loading,
     handleSubmit,
     title,
   };
