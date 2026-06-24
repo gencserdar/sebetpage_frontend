@@ -20,28 +20,31 @@ export interface FluidGradientConfig {
   color4: string;
   colorIntensity: number;
   softness: number;
+  /** Display blur strength (0 = off, ~0.3–0.6 = soft, 1+ = stronger). */
+  blur: number;
 }
 
 export const DEFAULT_FLUID_GRADIENT_CONFIG: FluidGradientConfig = {
-  brushSize: 52.0,
-  brushStrength: 0.88,
-  distortionAmount: 1.45,
+  brushSize: 45.0,
+  brushStrength: 0.57,
+  distortionAmount: 0.05,
   fluidDecay: 0.982,
   trailLength: 1.0,
   stopDecay: 0.92,
 
   swirlStrength: 1.15,
-  foldPersistence: 0.998,
+  foldPersistence: 0.996,
   advectionStrength: 0.95,
 
   permanentWarp: 1.05,
-  foldMotion: 0.85,
+  foldMotion: 1.85,
   foldSharpness: 2.4,
 
   color1: "#b8fff7",
   color2: "#6e3466",
   color3: "#0133ff",
   color4: "#66d1fe",
-  colorIntensity: 1.0,
+  colorIntensity: 0.6,
   softness: 1.0,
+  blur: 2.0,
 };

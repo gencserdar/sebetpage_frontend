@@ -22,6 +22,7 @@ export const fluidShader = `
   uniform float uSwirlStrength;
   uniform float uFoldPersistence;
   uniform float uAdvectionStrength;
+  uniform float uMouseBlend;
 
   varying vec2 vUv;
 
@@ -63,31 +64,25 @@ export const fluidShader = `
     vec2 vel = me.xy;
     float height = me.z;
     float activity = me.w;
+    float presence = clamp(uMouseBlend, 0.0, 1.0);
+    bool hasCoords = iMouse.z > 0.0;
 
-    // Hafif yayılma: aktif bölge etrafa taşsın ama çorba olmasın.
-    vel = mix(vel, blur.xy, 0.075);
-    height = mix(height, blur.z, 0.06);
-    activity = mix(activity, blur.w, 0.045);
+    vel = mix(vel, blur.xy, 0.06);
+    height = mix(height, blur.z, 0.05);
+    activity = mix(activity, blur.w, 0.018);
 
-    // Basit wave/pressure davranışı.
     vec2 gradH = vec2(e.z - west.z, n.z - s.z);
     float div = (e.x - west.x + n.y - s.y) * 0.5;
 
     vel -= gradH * 0.028;
     height -= div * 0.045;
 
-    // Activity maskesinin kenarından tangent flow üret.
-    // Bu kısım kıvrımların kendi kendine hareket etmesini sağlıyor.
     vec2 gradA = vec2(e.w - west.w, n.w - s.w);
     vec2 tangentA = vec2(-gradA.y, gradA.x);
+    float swirlDrive = mix(0.12, 1.0, presence);
+    vel += tangentA * activity * uSwirlStrength * 0.055 * uAdvectionStrength * swirlDrive;
 
-    vel += tangentA * activity * uSwirlStrength * 0.075 * uAdvectionStrength;
-
-    // Hafif iç hareket. Tamamen sabit kalmasın.
-    float aliveWave = sin(iTime * 1.4 + U.x * 0.018 + U.y * 0.013);
-    height += aliveWave * activity * 0.0045 * uAdvectionStrength;
-
-    if (iMouse.z > 0.0) {
+    if (hasCoords && presence > 0.015) {
       vec2 mousePos = iMouse.xy;
       vec2 mousePrev = iMouse.zw;
 
@@ -111,36 +106,37 @@ export const fluidShader = `
         vec2 tangent = vec2(-rel.y, rel.x) / max(length(rel), 1.0);
 
         float speedPower = clamp(speed / 34.0, 0.0, 1.0);
-        float strength = uBrushStrength * speedPower;
+        float strength = uBrushStrength * speedPower * presence;
 
-        // Mouse yönüne doğru itme.
         vel += dir * falloff * strength * 0.045;
-
-        // Kıvrımları ayıran / birleştiren swirl.
         vel += tangent * cursorFalloff * strength * uSwirlStrength * 0.026;
 
-        // Mouse çizgisinin iki tarafında farklı height oluştur.
-        // Bu yeni kıvrım üretir.
         float side = dot(U - mousePos, normal);
         float creaseStripe = sin(side * 0.11 + iTime * 1.8);
 
         height += falloff * strength * (0.075 + creaseStripe * 0.04);
 
-        // Activity: dokunulan alan canlı kalır, hareket etmeye devam eder.
-        activity += falloff * strength * 0.105;
-        activity += cursorFalloff * strength * 0.035;
+        activity += falloff * strength * 0.072;
+        activity += cursorFalloff * strength * 0.022;
       }
     }
 
     vel *= uFluidDecay;
-    height *= uTrailLength;
+    height *= max(uTrailLength, 0.88);
     activity *= uFoldPersistence;
 
-    // Çok kritik: clamp dar ama ölü değil.
-    // Mixer gibi patlamayı bu engelliyor.
+    activity *= mix(0.91, 1.0, presence);
+    vel *= mix(0.965, 1.0, presence);
+    height *= mix(0.94, 1.0, presence);
+
+    // 20 sn sonrası tatlı noktayı geçmesin — yumuşak tavan.
+    if (activity > 0.48) {
+      activity = mix(activity, 0.48, 0.08);
+    }
+
     vel = clamp(vel, vec2(-0.16), vec2(0.16));
     height = clamp(height, -0.45, 0.45);
-    activity = clamp(activity, 0.0, 0.85);
+    activity = clamp(activity, 0.0, 0.55);
 
     gl_FragColor = vec4(vel, height, activity);
   }
@@ -158,6 +154,7 @@ export const displayShader = `
   uniform vec3 uColor4;
   uniform float uColorIntensity;
   uniform float uSoftness;
+  uniform float uBlur;
 
   uniform float uPermanentWarp;
   uniform float uFoldMotion;
@@ -165,17 +162,39 @@ export const displayShader = `
 
   varying vec2 vUv;
 
+  vec4 sampleFluid(vec2 uv) {
+    return texture2D(iFluid, uv);
+  }
+
+  vec4 blurFluid(vec2 uv, vec2 px, float amount) {
+    vec4 center = sampleFluid(uv);
+    if (amount <= 0.001) return center;
+
+    vec2 r = px * (1.0 + amount * 4.5);
+    vec4 sum = center * 0.20;
+    sum += sampleFluid(uv + vec2(r.x, 0.0)) * 0.12;
+    sum += sampleFluid(uv - vec2(r.x, 0.0)) * 0.12;
+    sum += sampleFluid(uv + vec2(0.0, r.y)) * 0.12;
+    sum += sampleFluid(uv - vec2(0.0, r.y)) * 0.12;
+    sum += sampleFluid(uv + vec2(r.x, r.y) * 0.7071) * 0.11;
+    sum += sampleFluid(uv - vec2(r.x, r.y) * 0.7071) * 0.11;
+    sum += sampleFluid(uv + vec2(-r.x, r.y) * 0.7071) * 0.11;
+    sum += sampleFluid(uv - vec2(-r.x, r.y) * 0.7071) * 0.11;
+    return sum;
+  }
+
   void main() {
     vec2 fragCoord = vUv * iResolution;
     float mr = min(iResolution.x, iResolution.y);
 
     vec2 px = 1.0 / iResolution;
+    float blurAmt = clamp(uBlur, 0.0, 2.0);
 
-    vec4 fluid = texture2D(iFluid, vUv);
-    vec4 fx1 = texture2D(iFluid, vUv + vec2(px.x, 0.0));
-    vec4 fx2 = texture2D(iFluid, vUv - vec2(px.x, 0.0));
-    vec4 fy1 = texture2D(iFluid, vUv + vec2(0.0, px.y));
-    vec4 fy2 = texture2D(iFluid, vUv - vec2(0.0, px.y));
+    vec4 fluid = blurFluid(vUv, px, blurAmt);
+    vec4 fx1 = blurFluid(vUv + vec2(px.x, 0.0), px, blurAmt * 0.85);
+    vec4 fx2 = blurFluid(vUv - vec2(px.x, 0.0), px, blurAmt * 0.85);
+    vec4 fy1 = blurFluid(vUv + vec2(0.0, px.y), px, blurAmt * 0.85);
+    vec4 fy2 = blurFluid(vUv - vec2(0.0, px.y), px, blurAmt * 0.85);
 
     vec2 vel = fluid.xy;
     float height = fluid.z;
@@ -188,16 +207,14 @@ export const displayShader = `
 
     vec2 uv = (fragCoord * 2.0 - iResolution.xy) / mr;
 
-    // Statik pattern'i tamamen taşımıyoruz.
-    // Sadece aktif bölgede domain warp veriyoruz.
     uv += vel * uDistortionAmount * 0.72;
     uv += vec2(curl, -height) * uPermanentWarp * 0.18 * activity;
     uv += vec2(height, curl) * uPermanentWarp * 0.095 * activityRaw;
 
-    // Hareket sadece mouse'un canlandırdığı bölgede akar.
-    float localTime = iTime * uFoldMotion * activity;
+    // 20 sn ısınma noktasına sabitle — sonrasında büyümesin.
+    float warmedTime = min(iTime, 20.0);
+    float localTime = warmedTime * uFoldMotion * activity;
 
-    // Aktif bölgede yavaş lava drift.
     vec2 drift = vec2(
       sin(localTime * 0.9 + height * 2.4 + curl * 1.2),
       cos(localTime * 0.75 + curl * 2.1 - height * 1.5)
@@ -225,7 +242,6 @@ export const displayShader = `
       );
     }
 
-    // Burada localTime ve activity kıvrım çizgilerini hareket ettiriyor.
     float mixer1 = cos(uv.x * d + height * 1.4 + localTime * 0.18) * 0.5 + 0.5;
     float mixer2 = cos(uv.y * a + curl * 1.2 - localTime * 0.14) * 0.5 + 0.5;
     float mixer3 = sin(d + a + height * 1.1 + curl * 1.4) * 0.5 + 0.5;
@@ -240,20 +256,40 @@ export const displayShader = `
     color = mix(color, uColor3, mixer2);
     color = mix(color, uColor4, mixer3);
 
-    // Yeni kıvrım / birleşme çizgileri.
     float foldField =
       sin((d + a) * uFoldSharpness + height * 3.2 + curl * 2.1 + localTime * 0.35);
 
     float ridge = 1.0 - smoothstep(0.0, 0.32, abs(foldField));
 
-    // Sadece aktif bölgede ridge belirginleşsin.
     color = mix(color, color * 0.68, ridge * activity * 0.23);
 
-    // İki kıvrım birleşiyormuş gibi koyu sınır efekti.
     float mergeLine = smoothstep(0.08, 0.38, heightGrad) * activity;
     color = mix(color, color * 0.78, mergeLine * 0.18);
 
     color *= uColorIntensity;
+
+    if (blurAmt > 0.001) {
+      vec2 colorStep = px * (1.2 + blurAmt * 3.8);
+      vec3 softened = color;
+
+      for (float i = 0.0; i < 4.0; i += 1.0) {
+        float ang = i * 1.5707963;
+        vec2 off = vec2(cos(ang), sin(ang)) * colorStep;
+        vec4 neighbor = blurFluid(vUv + off, px, blurAmt * 0.65);
+        float nHeight = neighbor.z;
+        float nCurl = neighbor.y - neighbor.x;
+
+        float nMixer3 = sin(d + a + nHeight * 1.1 + nCurl * 1.4) * 0.5 + 0.5;
+        nMixer3 = mix(nMixer3, 0.5, smoothAmount);
+
+        vec3 nColor = mix(uColor1, uColor2, mixer1);
+        nColor = mix(nColor, uColor3, mixer2);
+        nColor = mix(nColor, uColor4, nMixer3);
+        softened += nColor * uColorIntensity;
+      }
+
+      color = mix(color, softened * 0.2, min(1.0, blurAmt * 0.72));
+    }
 
     gl_FragColor = vec4(color, 1.0);
   }

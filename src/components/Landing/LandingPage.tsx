@@ -465,14 +465,28 @@ function smoothstep(t: number) {
   return x * x * (3 - 2 * x);
 }
 
-function sectionOpacity(seg: number, i: number, slideCount: number) {
-  const i0 = Math.max(0, Math.min(slideCount - 1, Math.floor(seg)));
-  const i1 = Math.min(slideCount - 1, i0 + 1);
-  const frac = seg - i0;
-  if (i !== i0 && i !== i1) return 0;
-  if (i0 === i1) return i === i0 ? 1 : 0;
-  if (i === i0) return 1 - smoothstep(Math.min(1, frac / 0.5));
-  return smoothstep(Math.max(0, (frac - 0.28) / 0.55));
+function sectionMotion(seg: number, i: number) {
+  const t = seg - i;
+
+  if (t <= -1 || t >= 1) {
+    return { opacity: 0, x: -9, visible: false };
+  }
+
+  if (t <= 0) {
+    const p = smoothstep(t + 1);
+    return {
+      opacity: p,
+      x: -9 * (1 - p),
+      visible: p > 0.02,
+    };
+  }
+
+  const p = 1 - smoothstep(t);
+  return {
+    opacity: p,
+    x: -9 * (1 - p),
+    visible: p > 0.02,
+  };
 }
 
 function computeLineStyles(
@@ -536,7 +550,7 @@ function TriangleHero({
   restoreIndex?: number | null;
   onRestoreApplied?: () => void;
   onIndexChange: (i: number) => void;
-  onOpenDetails: () => void;
+  onOpenDetails: (fromIndex: number) => void;
 }) {
   const [index, setIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -558,6 +572,7 @@ function TriangleHero({
   const dragXRef = useRef(0);
   const dragYRef = useRef(0);
   const lockedPeekRef = useRef<number | null>(null);
+  const maxDragRef = useRef(0);
   const lastPtRef = useRef<{ x: number; y: number } | null>(null);
   const indexRef = useRef(0);
   const activeRef = useRef(active);
@@ -770,6 +785,7 @@ function TriangleHero({
     startYRef.current = e.clientY;
     dragXRef.current = 0;
     dragYRef.current = 0;
+    maxDragRef.current = 0;
     lockedPeekRef.current = null;
     lastPtRef.current = null;
     resetHeroFlips(engine);
@@ -782,8 +798,13 @@ function TriangleHero({
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current || ripplingRef.current) return;
+
     dragXRef.current = e.clientX - startXRef.current;
     dragYRef.current = e.clientY - startYRef.current;
+    maxDragRef.current = Math.max(
+      maxDragRef.current,
+      Math.hypot(dragXRef.current, dragYRef.current)
+    );
     lockPeekDirection(dragXRef.current, dragYRef.current);
     brushAt(e.clientX, e.clientY);
   };
@@ -793,14 +814,18 @@ function TriangleHero({
     draggingRef.current = false;
     lastPtRef.current = null;
 
-    const dx = dragXRef.current;
-    const dy = dragYRef.current;
     const peek = lockedPeekRef.current;
     const cur = indexRef.current;
     const engine = engineRef.current;
-    const dragDistance = Math.hypot(dx, dy);
+    const maxDrag = maxDragRef.current;
+    const seeds = engine ? collectRippleSeeds(engine) : [];
+    const shouldCommit =
+      peek !== null &&
+      (maxDrag >= HERO_SWIPE_THRESHOLD ||
+        (maxDrag >= HERO_DIR_LOCK_PX && seeds.length > 0));
 
-    if (peek !== null && dragDistance >= HERO_SWIPE_THRESHOLD) {
+    if (shouldCommit) {
+      maxDragRef.current = 0;
       runRipple(peek);
       return;
     }
@@ -810,6 +835,7 @@ function TriangleHero({
       setEngineImages(cur, wrapNext(cur, count));
     }
     lockedPeekRef.current = null;
+    maxDragRef.current = 0;
     setDragging(false);
     dragXRef.current = 0;
     dragYRef.current = 0;
@@ -854,7 +880,7 @@ function TriangleHero({
         type="button"
         className={`landing-cta-arrow${!stylesReady || dragging || transitioning ? " is-hidden" : ""}`}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={onOpenDetails}
+        onClick={() => onOpenDetails(indexRef.current)}
         aria-label="Explore details"
       >
         <span className="landing-cta-arrow__label">Explore</span>
@@ -893,6 +919,7 @@ export default function LandingPage({
     has: false,
   });
   const innerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const indicatorRef = useRef<HTMLDivElement | null>(null);
   const wheelLockRef = useRef(false);
 
   const updateScrollFx = useCallback(() => {
@@ -913,21 +940,89 @@ export default function LandingPage({
     for (let i = 0; i < innerRefs.current.length; i++) {
       const inner = innerRefs.current[i];
       if (!inner) continue;
-      const op = sectionOpacity(seg, i, count);
-      inner.style.opacity = op.toFixed(3);
-      inner.style.visibility = op < 0.02 ? "hidden" : "visible";
-      inner.style.transform = "none";
+      const motion = sectionMotion(seg, i);
+      inner.style.opacity = motion.opacity.toFixed(3);
+      inner.style.visibility = motion.visible ? "visible" : "hidden";
+      inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
+    }
+
+    const indicator = indicatorRef.current;
+    if (indicator) {
+      const ticks = indicator.querySelectorAll<HTMLButtonElement>(
+        ".landing-details__tick"
+      );
+      ticks.forEach((tick, i) => {
+        const dist = Math.abs(seg - i);
+        const isActive = dist < 0.42;
+        tick.classList.toggle("is-active", isActive);
+        tick.setAttribute("aria-current", isActive ? "true" : "false");
+      });
     }
   }, [sectionColors]);
 
-  const openDetails = useCallback(() => {
-    const idx = currentIndexRef.current;
-    openIndexRef.current = idx;
-    detailsSectionRef.current = idx;
-    setView("details");
-    setSwitchKey((k) => k + 1);
-    onDetailsOpenChange?.(true);
-  }, [onDetailsOpenChange]);
+  const scrollToExploreSection = useCallback((index: number) => {
+    const scroll = detailsRef.current;
+    if (!scroll) return;
+    const vh = scroll.clientHeight;
+    if (vh <= 0) return;
+    wheelLockRef.current = true;
+    scroll.scrollTo({ top: index * vh, behavior: "smooth" });
+    window.setTimeout(() => {
+      wheelLockRef.current = false;
+    }, 720);
+  }, []);
+
+  const jumpToExploreSection = useCallback(
+    (index: number) => {
+      const scroll = detailsRef.current;
+      if (!scroll) return;
+
+      const clamped = Math.max(0, Math.min(count - 1, index));
+
+      const apply = () => {
+        const vh = scroll.clientHeight;
+        if (vh <= 0) return false;
+
+        scroll.classList.add("is-instant");
+        scroll.scrollTop = clamped * vh;
+        requestAnimationFrame(() => {
+          scroll.classList.remove("is-instant");
+        });
+
+        detailsSectionRef.current = clamped;
+        const lava = lavaPaletteRef.current;
+        lava.seg = clamped;
+        lava.slideCount = count;
+        updateScrollFx();
+        return true;
+      };
+
+      if (!apply()) {
+        requestAnimationFrame(() => {
+          if (!apply()) requestAnimationFrame(apply);
+        });
+      }
+    },
+    [updateScrollFx]
+  );
+
+  const openDetails = useCallback(
+    (fromIndex?: number) => {
+      const idx = Math.max(
+        0,
+        Math.min(count - 1, fromIndex ?? currentIndexRef.current)
+      );
+      currentIndexRef.current = idx;
+      openIndexRef.current = idx;
+      detailsSectionRef.current = idx;
+      lavaPaletteRef.current.seg = idx;
+      lavaPaletteRef.current.slideCount = count;
+      setView("details");
+      setSwitchKey((k) => k + 1);
+      onDetailsOpenChange?.(true);
+    },
+    [onDetailsOpenChange]
+  );
 
   const closeDetails = useCallback(() => {
     setRestoreHeroIndex(detailsSectionRef.current);
@@ -946,13 +1041,13 @@ export default function LandingPage({
 
   useLayoutEffect(() => {
     if (view !== "details") return;
-    const pane = detailsRef.current;
-    if (!pane) return;
-    const idx = openIndexRef.current;
-    detailsSectionRef.current = idx;
-    pane.scrollTop = idx * pane.clientHeight;
-    updateScrollFx();
-  }, [view, updateScrollFx]);
+    jumpToExploreSection(openIndexRef.current);
+  }, [view, jumpToExploreSection]);
+
+  useEffect(() => {
+    if (view !== "details") return;
+    jumpToExploreSection(openIndexRef.current);
+  }, [view, jumpToExploreSection]);
 
   useEffect(() => {
     if (view !== "details") return;
@@ -1098,6 +1193,23 @@ export default function LandingPage({
             <span>Back</span>
           </button>
 
+          <nav
+            ref={indicatorRef}
+            className="landing-details__indicator"
+            aria-label="Explore sections"
+          >
+            {heroSlides.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                className="landing-details__tick"
+                aria-label={`Section ${i + 1}`}
+                aria-current="false"
+                onClick={() => scrollToExploreSection(i)}
+              />
+            ))}
+          </nav>
+
           <div className="landing-details__stage">
             <ExploreFluidGradient
               active={view === "details"}
@@ -1113,13 +1225,6 @@ export default function LandingPage({
                   innerRefs.current[i] = el;
                 }}
               >
-                <span className="landing-section__index">
-                  {String(i + 1).padStart(2, "0")}
-                  <span className="landing-section__index-total">
-                    {" "}
-                    / {String(count).padStart(2, "0")}
-                  </span>
-                </span>
                 <h2 className="landing-section__title">{s.title}</h2>
                 <p className="landing-section__text">{s.subtitle}</p>
 

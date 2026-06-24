@@ -10,3 +10,20 @@ export function rgbToHex([r, g, b]: [number, number, number]): string {
       .padStart(2, "0");
   return `#${to(r)}${to(g)}${to(b)}`;
 }
+
+export function lerpHex(a: string, b: string, t: number): string {
+  const clampT = Math.max(0, Math.min(1, t));
+  const [ar, ag, ab] = hexToRgb(a).map((v) => v * 255);
+  const [br, bg, bb] = hexToRgb(b).map((v) => v * 255);
+  return rgbToHex([
+    ar + (br - ar) * clampT,
+    ag + (bg - ag) * clampT,
+    ab + (bb - ab) * clampT,
+  ]);
+}
+
+export function hexColorDistance(a: string, b: string): number {
+  const [ar, ag, ab] = hexToRgb(a);
+  const [br, bg, bb] = hexToRgb(b);
+  return Math.hypot(ar - br, ag - bg, ab - bb);
+}
