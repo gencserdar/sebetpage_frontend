@@ -1,6 +1,12 @@
+import { useState } from "react";
+
 import ExploreGlobe from "./globe/ExploreGlobe";
+import GlobePostBubble from "./GlobePostBubble";
+import type { GlobePost } from "./mockGlobePosts";
 
 export default function ExploreShareStage({ subtitle }: { subtitle: string }) {
+  const [activePost, setActivePost] = useState<GlobePost | null>(null);
+
   return (
     <div className="landing-share">
       <div className="landing-share__story">
@@ -15,7 +21,10 @@ export default function ExploreShareStage({ subtitle }: { subtitle: string }) {
 
       <div className="landing-share__showcase" aria-label="Global sharing preview">
         <div className="landing-share__showcase-glow" aria-hidden />
-        <ExploreGlobe />
+        <div className="landing-share__globe-stage">
+          <ExploreGlobe onActivePostChange={setActivePost} />
+          {activePost ? <GlobePostBubble post={activePost} /> : null}
+        </div>
       </div>
     </div>
   );

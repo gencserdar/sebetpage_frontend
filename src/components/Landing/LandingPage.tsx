@@ -84,7 +84,7 @@ const heroSlides: HeroSlide[] = [
     hue: 330,
     title: "Share Your moment.",
     subtitle:
-      "Post photos, videos, and updates that keep your memories alive.",
+      "Drop a photo from the street you are on, a clip from last night, or a quiet note about something small that mattered. Let your people know what you are up to!",
     block: "between",
     lines: [
       { text: "Share", from: "bottom", align: "center", color : "#697CF5" },
@@ -470,11 +470,36 @@ function smoothstep(t: number) {
   return x * x * (3 - 2 * x);
 }
 
-function sectionMotion(seg: number, i: number) {
+/** Slower vertical glide for the globe (vs section text). */
+function globeGlide(t: number) {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * x * (x * (6 * x - 15) + 10);
+}
+
+const SHARE_GLOBE_TRAVEL = 14;
+
+function shareGlobeY(t: number, scrollDir: number) {
+  if (t <= -1 || t >= 1) return 0;
+  if (t <= 0) {
+    const p = globeGlide(t + 1);
+    return scrollDir >= 0 ? SHARE_GLOBE_TRAVEL * (1 - p) : -SHARE_GLOBE_TRAVEL * (1 - p);
+  }
+  const p = 1 - globeGlide(t);
+  return scrollDir >= 0 ? -SHARE_GLOBE_TRAVEL * (1 - p) : SHARE_GLOBE_TRAVEL * (1 - p);
+}
+
+type SectionMotionState = {
+  opacity: number;
+  x: number;
+  y: number;
+  visible: boolean;
+};
+
+function sectionMotion(seg: number, i: number, scrollDir: number): SectionMotionState {
   const t = seg - i;
 
   if (t <= -1 || t >= 1) {
-    return { opacity: 0, x: -9, visible: false };
+    return { opacity: 0, x: -9, y: 0, visible: false };
   }
 
   if (t <= 0) {
@@ -482,6 +507,7 @@ function sectionMotion(seg: number, i: number) {
     return {
       opacity: p,
       x: -9 * (1 - p),
+      y: shareGlobeY(t, scrollDir),
       visible: p > 0.02,
     };
   }
@@ -490,6 +516,7 @@ function sectionMotion(seg: number, i: number) {
   return {
     opacity: p,
     x: -9 * (1 - p),
+    y: shareGlobeY(t, scrollDir),
     visible: p > 0.02,
   };
 }
@@ -499,30 +526,42 @@ function sectionMotionJump(
   to: number,
   progress: number,
   i: number
-) {
+): SectionMotionState {
+  const scrollDir = to > from ? 1 : -1;
+
   if (from === to) {
     return i === from
-      ? { opacity: 1, x: 0, visible: true }
-      : { opacity: 0, x: -9, visible: false };
+      ? { opacity: 1, x: 0, y: 0, visible: true }
+      : { opacity: 0, x: -9, y: 0, visible: false };
   }
 
   if (i !== from && i !== to) {
-    return { opacity: 0, x: -9, visible: false };
+    return { opacity: 0, x: -9, y: 0, visible: false };
   }
 
   if (i === from) {
     const p = 1 - smoothstep(progress);
+    const glide = 1 - globeGlide(progress);
     return {
       opacity: p,
       x: -9 * (1 - p),
+      y:
+        scrollDir >= 0
+          ? -SHARE_GLOBE_TRAVEL * glide
+          : SHARE_GLOBE_TRAVEL * glide,
       visible: p > 0.02,
     };
   }
 
   const p = smoothstep(progress);
+  const glide = 1 - globeGlide(progress);
   return {
     opacity: p,
     x: -9 * (1 - p),
+    y:
+      scrollDir >= 0
+        ? SHARE_GLOBE_TRAVEL * glide
+        : -SHARE_GLOBE_TRAVEL * glide,
     visible: p > 0.02,
   };
 }
@@ -972,11 +1011,13 @@ export default function LandingPage({
     duration: number;
   } | null>(null);
   const jumpRafRef = useRef(0);
+  const lastScrollSegRef = useRef(0);
+  const scrollDirRef = useRef(1);
 
   const applySectionMotion = useCallback(
     (
       inner: HTMLDivElement,
-      motion: { opacity: number; x: number; visible: boolean }
+      motion: { opacity: number; x: number; y: number; visible: boolean }
     ) => {
       if (inner.classList.contains("landing-section__inner--share")) {
         inner.style.opacity = "1";
@@ -986,14 +1027,18 @@ export default function LandingPage({
         const opacity = motion.opacity;
         const opacityStr = opacity.toFixed(3);
         const textX = motion.x.toFixed(2);
-        const showcaseX = (-motion.x).toFixed(2);
+        const globeY = motion.y.toFixed(2);
         const visibility = motion.visible ? "visible" : "hidden";
+        const globeScale = (0.92 + opacity * 0.08).toFixed(3);
 
         const storyCopy = inner.querySelector<HTMLElement>(
           ".landing-share__story-copy"
         );
         const showcase = inner.querySelector<HTMLElement>(
           ".landing-share__showcase"
+        );
+        const globeStage = inner.querySelector<HTMLElement>(
+          ".landing-share__globe-stage"
         );
 
         if (storyCopy) {
@@ -1004,7 +1049,12 @@ export default function LandingPage({
         if (showcase) {
           showcase.style.opacity = opacityStr;
           showcase.style.visibility = visibility;
-          showcase.style.transform = `translate3d(${showcaseX}%, 0, 0) scale(${0.92 + opacity * 0.08})`;
+          showcase.style.transform = "none";
+        }
+        if (globeStage) {
+          globeStage.style.opacity = opacityStr;
+          globeStage.style.visibility = visibility;
+          globeStage.style.transform = `translate3d(0, ${globeY}vh, 0) scale(${globeScale})`;
         }
         return;
       }
@@ -1081,6 +1131,13 @@ export default function LandingPage({
     if (vh <= 0) return;
 
     const seg = pane.scrollTop / vh;
+    if (seg > lastScrollSegRef.current + 0.001) {
+      scrollDirRef.current = 1;
+    } else if (seg < lastScrollSegRef.current - 0.001) {
+      scrollDirRef.current = -1;
+    }
+    lastScrollSegRef.current = seg;
+
     const jump = sectionJumpRef.current;
     const jumpProgress = jump
       ? Math.min(1, (performance.now() - jump.startedAt) / jump.duration)
@@ -1113,7 +1170,7 @@ export default function LandingPage({
       const motion =
         jump && jumpProgress !== null
           ? sectionMotionJump(jump.from, jump.to, jumpProgress, i)
-          : sectionMotion(seg, i);
+          : sectionMotion(seg, i, scrollDirRef.current);
       applySectionMotion(inner, motion);
     }
 

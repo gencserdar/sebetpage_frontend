@@ -1,11 +1,22 @@
 import * as THREE from "three";
 
-export default function getStarfield({ numStars = 800 } = {}) {
+type StarfieldOptions = {
+  numStars?: number;
+  minRadius?: number;
+  maxRadius?: number;
+};
+
+export default function getStarfield({
+  numStars = 2400,
+  minRadius = 30,
+  maxRadius = 78,
+}: StarfieldOptions = {}) {
   const verts: number[] = [];
   const colors: number[] = [];
+  const span = maxRadius - minRadius;
 
   for (let i = 0; i < numStars; i += 1) {
-    const radius = Math.random() * 25 + 25;
+    const radius = Math.random() * span + minRadius;
     const u = Math.random();
     const v = Math.random();
     const theta = 2 * Math.PI * u;

@@ -6,6 +6,7 @@ declare module "three/examples/jsm/controls/OrbitControls.js" {
     constructor(object: Camera, domElement?: HTMLElement | null);
     enabled: boolean;
     enableDamping: boolean;
+    dampingFactor: number;
     enablePan: boolean;
     enableZoom: boolean;
     autoRotate: boolean;

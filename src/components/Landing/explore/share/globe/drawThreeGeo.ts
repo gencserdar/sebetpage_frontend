@@ -1,5 +1,9 @@
 import * as THREE from "three";
 
+import { buildGlobeSphereGeometry } from "./globeSphereGeometry";
+import { createLandSphereMaterial } from "./landSphereMaterial";
+import { createLandMaskCanvas } from "./landMaskTexture";
+
 type GeoJson = {
   type: string;
   features?: { geometry: GeoGeometry }[];
@@ -15,7 +19,16 @@ type GeoGeometry = {
 type MaterialOptions = {
   color?: number;
   opacity?: number;
+  fillColor?: number;
+  fillOpacity?: number;
 };
+
+function hexToRgba(hex: number, alpha: number) {
+  const r = (hex >> 16) & 255;
+  const g = (hex >> 8) & 255;
+  const b = hex & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 export function drawThreeGeo({
   json,
@@ -31,8 +44,24 @@ export function drawThreeGeo({
 
   const lineColor = materialOptions.color ?? 0x697cf5;
   const lineOpacity = materialOptions.opacity ?? 0.72;
-  const geometries = createGeometryArray(json);
+  const fillColor = materialOptions.fillColor ?? 0x4f6fe8;
+  const fillOpacity = materialOptions.fillOpacity ?? 0.3;
 
+  const landCanvas = createLandMaskCanvas(
+    json,
+    hexToRgba(fillColor, Math.min(1, fillOpacity * 1.15))
+  );
+  const landTexture = new THREE.CanvasTexture(landCanvas);
+  landTexture.anisotropy = 4;
+
+  const landMesh = new THREE.Mesh(
+    buildGlobeSphereGeometry(radius * 0.9995, 160, 80),
+    createLandSphereMaterial(landTexture)
+  );
+  landMesh.renderOrder = 0;
+  container.add(landMesh);
+
+  const geometries = createGeometryArray(json);
   for (const geom of geometries) {
     drawGeometry(geom, radius, lineColor, lineOpacity, container);
   }
@@ -101,16 +130,13 @@ function addLineRing(
   const dense = densifyRing(ring);
   const verts: number[] = [];
 
-  for (const point of dense) {
-    const [lon, lat] = point;
+  for (const [lon, lat] of dense) {
+    const latRad = (lat * Math.PI) / 180;
+    const lonRad = (lon * Math.PI) / 180;
     verts.push(
-      Math.cos((lat * Math.PI) / 180) *
-        Math.cos((lon * Math.PI) / 180) *
-        radius,
-      Math.cos((lat * Math.PI) / 180) *
-        Math.sin((lon * Math.PI) / 180) *
-        radius,
-      Math.sin((lat * Math.PI) / 180) * radius
+      Math.cos(latRad) * Math.cos(lonRad) * radius,
+      Math.cos(latRad) * Math.sin(lonRad) * radius,
+      Math.sin(latRad) * radius
     );
   }
 
@@ -123,11 +149,13 @@ function addLineRing(
     color,
     transparent: true,
     opacity,
+    depthWrite: false,
   });
 
   const line = closed
     ? new THREE.LineLoop(geometry, material)
     : new THREE.Line(geometry, material);
+  line.renderOrder = 2;
   container.add(line);
 }
 
