@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 
 import {
   buildFluidBaseGradient,
+  EXPLORE_SECTION_PALETTES,
+  lerpPalettes,
   paletteToCssBase,
   resolveFluidPalette,
+  type FluidPalette,
 } from "../exploreFluidPalettes";
 import { createFluidGradient } from "./createFluidGradient";
 import { detectGpuProfile } from "./gpuProfile";
@@ -20,10 +23,24 @@ const SEG_FOLLOW = 0.055;
 const SEG_FOLLOW_SETTLED = 0.082;
 const SETTLED_SEG = 0.03;
 
+function smoothstep(t: number) {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
+export interface LavaPaletteJump {
+  from: number;
+  to: number;
+  progress: number;
+  /** Mid-transition snapshot when retargeting a jump. */
+  fromPalette?: FluidPalette | null;
+}
+
 export interface LavaPaletteState {
   sectionColors: string[];
   seg: number;
   slideCount: number;
+  paletteJump?: LavaPaletteJump | null;
 }
 
 export interface LavaPointerState {
@@ -67,6 +84,7 @@ export default function ExploreFluidGradient({
     has: false,
   });
   const rafRef = useRef(0);
+  const paletteJumpActiveRef = useRef(false);
   const gpuProfile = useMemo(() => detectGpuProfile(), []);
   const useCssFallback = gpuProfile === "css-only";
 
@@ -84,20 +102,67 @@ export default function ExploreFluidGradient({
       const paletteState = paletteRef.current;
       if (!paletteState) return;
 
-      const targetSeg = paletteState.seg;
-      const settled =
-        Math.abs(targetSeg - Math.round(targetSeg)) < SETTLED_SEG;
-      const aimSeg = settled ? Math.round(targetSeg) : targetSeg;
+      const jump = paletteState.paletteJump;
+      let resolved: ReturnType<typeof resolveFluidPalette>;
+      let settled = false;
+      let jumpBlend: number | null = null;
 
-      let displaySeg = displaySegRef.current;
-      const segFollow = settled ? SEG_FOLLOW_SETTLED : SEG_FOLLOW;
-      displaySeg += (aimSeg - displaySeg) * segFollow;
-      displaySegRef.current = displaySeg;
+      if (jump) {
+        paletteJumpActiveRef.current = true;
+        const palettes = EXPLORE_SECTION_PALETTES;
+        const fromIdx = Math.max(
+          0,
+          Math.min(paletteState.slideCount - 1, jump.from)
+        );
+        const toIdx = Math.max(
+          0,
+          Math.min(paletteState.slideCount - 1, jump.to)
+        );
+        const t = smoothstep(jump.progress);
+        const pFrom = jump.fromPalette ?? palettes[Math.min(fromIdx, palettes.length - 1)];
+        const pTo = palettes[Math.min(toIdx, palettes.length - 1)];
+        resolved = lerpPalettes(pFrom, pTo, t);
+        settled = jump.progress >= 0.995;
+        jumpBlend = jump.progress >= 0.999 ? 1 : 0.42 + t * 0.58;
+        if (settled) {
+          displaySegRef.current = toIdx;
+        }
+      } else {
+        if (paletteJumpActiveRef.current) {
+          paletteJumpActiveRef.current = false;
+          const aim = Math.round(paletteState.seg);
+          displaySegRef.current = aim;
+          resolved = resolveFluidPalette(aim, paletteState.slideCount);
 
-      const resolved = resolveFluidPalette(
-        displaySegRef.current,
-        paletteState.slideCount
-      );
+          if (useCssFallback) {
+            const el = fallbackRef.current;
+            if (el) applyCssPalette(el, resolved);
+            return;
+          }
+
+          const target = applyPaletteToConfig(
+            DEFAULT_FLUID_GRADIENT_CONFIG,
+            resolved
+          );
+          colorConfigRef.current = target;
+          engineRef.current?.setConfig(colorConfigRef.current);
+          return;
+        }
+
+        const targetSeg = paletteState.seg;
+        settled = Math.abs(targetSeg - Math.round(targetSeg)) < SETTLED_SEG;
+        const aimSeg = settled ? Math.round(targetSeg) : targetSeg;
+
+        let displaySeg = displaySegRef.current;
+        const segFollow = settled ? SEG_FOLLOW_SETTLED : SEG_FOLLOW;
+        displaySeg += (aimSeg - displaySeg) * segFollow;
+        displaySegRef.current = displaySeg;
+
+        resolved = resolveFluidPalette(
+          displaySegRef.current,
+          paletteState.slideCount
+        );
+      }
 
       if (useCssFallback) {
         const el = fallbackRef.current;
@@ -110,16 +175,27 @@ export default function ExploreFluidGradient({
         resolved
       );
 
-      const maxDist = maxFluidConfigColorDistance(
-        colorConfigRef.current,
-        target
-      );
-      const blend = adaptiveColorBlend(maxDist, settled);
-      colorConfigRef.current = lerpFluidConfigColors(
-        colorConfigRef.current,
-        target,
-        blend
-      );
+      if (jumpBlend !== null) {
+        colorConfigRef.current =
+          jumpBlend >= 0.999
+            ? target
+            : lerpFluidConfigColors(
+                colorConfigRef.current,
+                target,
+                jumpBlend
+              );
+      } else {
+        const maxDist = maxFluidConfigColorDistance(
+          colorConfigRef.current,
+          target
+        );
+        const blend = adaptiveColorBlend(maxDist, settled);
+        colorConfigRef.current = lerpFluidConfigColors(
+          colorConfigRef.current,
+          target,
+          blend
+        );
+      }
 
       engineRef.current?.setConfig(colorConfigRef.current);
     };

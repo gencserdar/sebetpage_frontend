@@ -25,16 +25,20 @@ import {
   wrapNext,
   wrapPrev,
   type HeroEngine,
-} from "./triangleHeroEngine";
+} from "./hero/triangleHeroEngine";
 import ExploreFluidGradient, {
   type LavaPaletteState,
   type LavaPointerState,
-} from "./fluidGradient/ExploreFluidGradient";
-import ExploreCommunitySearch from "./ExploreCommunitySearch";
+} from "./explore/fluidGradient/ExploreFluidGradient";
+import ExploreDiscoverStage from "./explore/discover/ExploreDiscoverStage";
+import ExploreShareStage from "./explore/share/ExploreShareStage";
+import { radialExitOffset } from "./explore/discover/exploreShowcaseRing";
+import type { FluidPalette } from "./explore/exploreFluidPalettes";
 import {
   EXPLORE_SECTION_PALETTES,
+  lerpPalettes,
   paletteToCssBase,
-} from "./exploreFluidPalettes";
+} from "./explore/exploreFluidPalettes";
 
 type TitleFrom = "left" | "right" | "top" | "bottom";
 type TitleAlign = "left" | "center" | "right";
@@ -490,6 +494,41 @@ function sectionMotion(seg: number, i: number) {
   };
 }
 
+function sectionMotionJump(
+  from: number,
+  to: number,
+  progress: number,
+  i: number
+) {
+  if (from === to) {
+    return i === from
+      ? { opacity: 1, x: 0, visible: true }
+      : { opacity: 0, x: -9, visible: false };
+  }
+
+  if (i !== from && i !== to) {
+    return { opacity: 0, x: -9, visible: false };
+  }
+
+  if (i === from) {
+    const p = 1 - smoothstep(progress);
+    return {
+      opacity: p,
+      x: -9 * (1 - p),
+      visible: p > 0.02,
+    };
+  }
+
+  const p = smoothstep(progress);
+  return {
+    opacity: p,
+    x: -9 * (1 - p),
+    visible: p > 0.02,
+  };
+}
+
+const EXPLORE_SECTION_JUMP_MS = 640;
+
 function computeLineStyles(
   img: HTMLImageElement,
   vw: number,
@@ -911,6 +950,7 @@ export default function LandingPage({
     sectionColors: exploreSectionCssColors,
     seg: 0,
     slideCount: count,
+    paletteJump: null,
   });
   const lavaPointerRef = useRef<LavaPointerState>({
     x: 0.5,
@@ -922,6 +962,117 @@ export default function LandingPage({
   const innerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const indicatorRef = useRef<HTMLDivElement | null>(null);
   const wheelLockRef = useRef(false);
+  const sectionJumpRef = useRef<{
+    from: number;
+    to: number;
+    paletteFrom: number;
+    paletteTo: number;
+    fromPaletteSnapshot: FluidPalette | null;
+    startedAt: number;
+    duration: number;
+  } | null>(null);
+  const jumpRafRef = useRef(0);
+
+  const applySectionMotion = useCallback(
+    (
+      inner: HTMLDivElement,
+      motion: { opacity: number; x: number; visible: boolean }
+    ) => {
+      if (inner.classList.contains("landing-section__inner--share")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity;
+        const opacityStr = opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const showcaseX = (-motion.x).toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const storyCopy = inner.querySelector<HTMLElement>(
+          ".landing-share__story-copy"
+        );
+        const showcase = inner.querySelector<HTMLElement>(
+          ".landing-share__showcase"
+        );
+
+        if (storyCopy) {
+          storyCopy.style.opacity = opacityStr;
+          storyCopy.style.visibility = visibility;
+          storyCopy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (showcase) {
+          showcase.style.opacity = opacityStr;
+          showcase.style.visibility = visibility;
+          showcase.style.transform = `translate3d(${showcaseX}%, 0, 0) scale(${0.92 + opacity * 0.08})`;
+        }
+        return;
+      }
+
+      if (inner.classList.contains("landing-section__inner--discover")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity;
+        const opacityStr = opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const searchLift = ((1 - opacity) * 40).toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const storyCopy = inner.querySelector<HTMLElement>(
+          ".landing-discover__story-copy"
+        );
+        const search = inner.querySelector<HTMLElement>(
+          ".landing-discover__search"
+        );
+        const showcase = inner.querySelector<HTMLElement>(
+          ".landing-discover__showcase"
+        );
+
+        if (storyCopy) {
+          storyCopy.style.opacity = opacityStr;
+          storyCopy.style.visibility = visibility;
+          storyCopy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (search) {
+          search.style.opacity = opacityStr;
+          search.style.visibility = visibility;
+          search.style.transform = `translate3d(0, ${searchLift}px, 0)`;
+        }
+        if (showcase) {
+          showcase.style.opacity = "1";
+          showcase.style.visibility = visibility;
+          showcase.style.transform = "none";
+
+          const aura = showcase.querySelector<HTMLElement>(
+            ".landing-discover__showcase-aura"
+          );
+          if (aura) aura.style.opacity = opacityStr;
+
+          const cardWraps = showcase.querySelectorAll<HTMLElement>(
+            ".landing-discover-card-wrap"
+          );
+          cardWraps.forEach((wrap) => {
+            const left = Number.parseFloat(wrap.style.left);
+            const top = Number.parseFloat(wrap.style.top);
+            if (!Number.isFinite(left) || !Number.isFinite(top)) return;
+
+            const radial = radialExitOffset(left, top, opacity);
+            wrap.style.opacity = opacityStr;
+            wrap.style.visibility = visibility;
+            wrap.style.transform = `translate(calc(-50% + ${radial.x.toFixed(2)}%), calc(-50% + ${radial.y.toFixed(2)}%))`;
+          });
+        }
+        return;
+      }
+
+      inner.style.opacity = motion.opacity.toFixed(3);
+      inner.style.visibility = motion.visible ? "visible" : "hidden";
+      inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
+    },
+    []
+  );
 
   const updateScrollFx = useCallback(() => {
     const pane = detailsRef.current;
@@ -930,77 +1081,146 @@ export default function LandingPage({
     if (vh <= 0) return;
 
     const seg = pane.scrollTop / vh;
-    const idx = Math.round(seg);
-    detailsSectionRef.current = Math.max(0, Math.min(count - 1, idx));
+    const jump = sectionJumpRef.current;
+    const jumpProgress = jump
+      ? Math.min(1, (performance.now() - jump.startedAt) / jump.duration)
+      : null;
+    const idx = jump ? jump.to : Math.round(seg);
+    if (!jump) {
+      detailsSectionRef.current = Math.max(0, Math.min(count - 1, idx));
+    }
 
     const lava = lavaPaletteRef.current;
     lava.sectionColors = sectionColors;
-    lava.seg = seg;
     lava.slideCount = count;
+
+    if (jump && jumpProgress !== null) {
+      lava.seg = jump.paletteTo;
+      lava.paletteJump = {
+        from: jump.paletteFrom,
+        to: jump.paletteTo,
+        fromPalette: jump.fromPaletteSnapshot,
+        progress: jumpProgress,
+      };
+    } else {
+      lava.seg = seg;
+      lava.paletteJump = null;
+    }
 
     for (let i = 0; i < innerRefs.current.length; i++) {
       const inner = innerRefs.current[i];
       if (!inner) continue;
-      const motion = sectionMotion(seg, i);
-
-      if (inner.classList.contains("landing-section__inner--discover")) {
-        inner.style.opacity = "1";
-        inner.style.visibility = motion.visible ? "visible" : "hidden";
-        inner.style.transform = "none";
-
-        const opacity = motion.opacity.toFixed(3);
-        const textX = motion.x.toFixed(2);
-        const searchX = (-motion.x).toFixed(2);
-        const visibility = motion.visible ? "visible" : "hidden";
-
-        const copy = inner.querySelector<HTMLElement>(".landing-section__copy");
-        const search = inner.querySelector<HTMLElement>(
-          ".landing-section__community-search"
-        );
-
-        if (copy) {
-          copy.style.opacity = opacity;
-          copy.style.visibility = visibility;
-          copy.style.transform = `translate3d(${textX}%, 0, 0)`;
-        }
-        if (search) {
-          search.style.opacity = opacity;
-          search.style.visibility = visibility;
-          search.style.transform = `translate3d(${searchX}%, 0, 0)`;
-        }
-        continue;
-      }
-
-      inner.style.opacity = motion.opacity.toFixed(3);
-      inner.style.visibility = motion.visible ? "visible" : "hidden";
-      inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
+      const motion =
+        jump && jumpProgress !== null
+          ? sectionMotionJump(jump.from, jump.to, jumpProgress, i)
+          : sectionMotion(seg, i);
+      applySectionMotion(inner, motion);
     }
 
     const indicator = indicatorRef.current;
     if (indicator) {
+      const indicatorSeg = jump ? jump.to : seg;
       const ticks = indicator.querySelectorAll<HTMLButtonElement>(
         ".landing-details__tick"
       );
       ticks.forEach((tick, i) => {
-        const dist = Math.abs(seg - i);
+        const dist = Math.abs(indicatorSeg - i);
         const isActive = dist < 0.42;
         tick.classList.toggle("is-active", isActive);
         tick.setAttribute("aria-current", isActive ? "true" : "false");
       });
     }
-  }, [sectionColors]);
+  }, [sectionColors, applySectionMotion]);
 
-  const scrollToExploreSection = useCallback((index: number) => {
-    const scroll = detailsRef.current;
-    if (!scroll) return;
-    const vh = scroll.clientHeight;
-    if (vh <= 0) return;
-    wheelLockRef.current = true;
-    scroll.scrollTo({ top: index * vh, behavior: "smooth" });
-    window.setTimeout(() => {
-      wheelLockRef.current = false;
-    }, 720);
-  }, []);
+  const navigateToExploreSection = useCallback(
+    (index: number) => {
+      const scroll = detailsRef.current;
+      if (!scroll) return;
+
+      const vh = scroll.clientHeight;
+      if (vh <= 0) return;
+
+      const clamped = Math.max(0, Math.min(count - 1, index));
+      const active = sectionJumpRef.current;
+      const contentFrom = active?.to ?? detailsSectionRef.current;
+
+      if (!active && contentFrom === clamped) return;
+
+      let paletteFrom = detailsSectionRef.current;
+      let paletteTo = clamped;
+      let fromPaletteSnapshot: FluidPalette | null = null;
+
+      if (active) {
+        const progress = Math.min(
+          1,
+          (performance.now() - active.startedAt) / active.duration
+        );
+        const palettes = EXPLORE_SECTION_PALETTES;
+        const fromPalette =
+          palettes[Math.min(active.paletteFrom, palettes.length - 1)];
+        const toPalette =
+          palettes[Math.min(active.paletteTo, palettes.length - 1)];
+        fromPaletteSnapshot = lerpPalettes(
+          fromPalette,
+          toPalette,
+          smoothstep(progress)
+        );
+        paletteFrom = active.paletteFrom;
+      }
+
+      if (jumpRafRef.current) {
+        cancelAnimationFrame(jumpRafRef.current);
+        jumpRafRef.current = 0;
+      }
+
+      scroll.classList.add("is-instant");
+      scroll.scrollTop = clamped * vh;
+      requestAnimationFrame(() => {
+        scroll.classList.remove("is-instant");
+      });
+
+      lavaPaletteRef.current.slideCount = count;
+
+      sectionJumpRef.current = {
+        from: contentFrom,
+        to: clamped,
+        paletteFrom,
+        paletteTo,
+        fromPaletteSnapshot,
+        startedAt: performance.now(),
+        duration: EXPLORE_SECTION_JUMP_MS,
+      };
+      wheelLockRef.current = true;
+
+      const tick = (now: number) => {
+        const jump = sectionJumpRef.current;
+        if (!jump) return;
+
+        updateScrollFx();
+
+        const progress = Math.min(1, (now - jump.startedAt) / jump.duration);
+        if (progress < 1) {
+          jumpRafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+
+        detailsSectionRef.current = jump.to;
+        sectionJumpRef.current = null;
+        jumpRafRef.current = 0;
+        wheelLockRef.current = false;
+
+        const lava = lavaPaletteRef.current;
+        lava.seg = jump.paletteTo;
+        lava.paletteJump = null;
+
+        updateScrollFx();
+      };
+
+      jumpRafRef.current = requestAnimationFrame(tick);
+      updateScrollFx();
+    },
+    [updateScrollFx]
+  );
 
   const jumpToExploreSection = useCallback(
     (index: number) => {
@@ -1023,6 +1243,8 @@ export default function LandingPage({
         const lava = lavaPaletteRef.current;
         lava.seg = clamped;
         lava.slideCount = count;
+        lava.paletteJump = null;
+        sectionJumpRef.current = null;
         updateScrollFx();
         return true;
       };
@@ -1143,6 +1365,7 @@ export default function LandingPage({
 
     let raf = 0;
     const onScroll = () => {
+      if (sectionJumpRef.current) return;
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
@@ -1170,6 +1393,7 @@ export default function LandingPage({
     };
 
     const onScrollEnd = () => {
+      if (sectionJumpRef.current) return;
       wheelLockRef.current = false;
       updateScrollFx();
     };
@@ -1186,6 +1410,9 @@ export default function LandingPage({
       pane.removeEventListener("wheel", onWheel, { capture: true });
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
+      if (jumpRafRef.current) cancelAnimationFrame(jumpRafRef.current);
+      sectionJumpRef.current = null;
+      lavaPaletteRef.current.paletteJump = null;
       wheelLockRef.current = false;
     };
   }, [view, updateScrollFx]);
@@ -1235,7 +1462,7 @@ export default function LandingPage({
                 className="landing-details__tick"
                 aria-label={`Section ${i + 1}`}
                 aria-current="false"
-                onClick={() => scrollToExploreSection(i)}
+                onClick={() => navigateToExploreSection(i)}
               />
             ))}
           </nav>
@@ -1251,18 +1478,26 @@ export default function LandingPage({
               <div
                 key={i}
                 className={`landing-section__inner${
-                  i === 0 ? " landing-section__inner--discover" : ""
+                  i === 0
+                    ? " landing-section__inner--discover"
+                    : i === 1
+                      ? " landing-section__inner--share"
+                      : ""
                 }`}
                 ref={(el) => {
                   innerRefs.current[i] = el;
                 }}
               >
-                <div className={i === 0 ? "landing-section__copy" : undefined}>
-                  <h2 className="landing-section__title">{s.title}</h2>
-                  <p className="landing-section__text">{s.subtitle}</p>
-                </div>
-
-                {i === 0 && <ExploreCommunitySearch />}
+                {i === 0 ? (
+                  <ExploreDiscoverStage subtitle={s.subtitle} />
+                ) : i === 1 ? (
+                  <ExploreShareStage subtitle={s.subtitle} />
+                ) : (
+                  <>
+                    <h2 className="landing-section__title">{s.title}</h2>
+                    <p className="landing-section__text">{s.subtitle}</p>
+                  </>
+                )}
 
                 {i === count - 1 && (
                   <div className="landing-section__actions">

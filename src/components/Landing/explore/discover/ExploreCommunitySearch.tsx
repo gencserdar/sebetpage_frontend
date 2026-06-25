@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   searchPublicCommunities,
   type PublicCommunity,
-} from "../../services/communityService";
+} from "../../../../services/communityService";
 
 const MIN_QUERY = 2;
 const DEBOUNCE_MS = 280;
