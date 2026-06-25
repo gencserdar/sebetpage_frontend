@@ -19,6 +19,7 @@ declare module "three" {
     z: number;
     set(x: number, y: number, z: number): this;
     clone(): Vector3;
+    copy(v: Vector3): this;
     sub(v: Vector3): this;
     normalize(): this;
     dot(v: Vector3): number;

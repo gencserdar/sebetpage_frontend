@@ -14,6 +14,8 @@ const LAND_URL = `${process.env.PUBLIC_URL ?? ""}/geojson/ne_110m_land.json`;
 const GLOBE_RADIUS = 4.35;
 const FACE_THRESHOLD = 0.74;
 const MARKER_FACE_MIN = 0.08;
+/** Min camera travel before post bubbles can open (after grab + rotate). */
+const DRAG_MOVE_THRESHOLD = 0.14;
 const NORMAL_ROTATE = 0.42;
 const FAST_ROTATE = 3.1;
 const ROTATE_EASE_MS = 3000;
@@ -46,6 +48,7 @@ export default function ExploreGlobe({
     let visible = false;
     let manualExploring = false;
     let isDragging = false;
+    let hasRotatedEnough = false;
     let lastActiveId: string | null = null;
     let prevShowcaseOpacity = 0;
     let spinEaseStart = 0;
@@ -122,6 +125,7 @@ export default function ExploreGlobe({
 
     const globeCenter = new THREE.Vector3();
     const surfaceWorld = new THREE.Vector3();
+    const dragStartCam = new THREE.Vector3();
 
     const clearActivePost = () => {
       if (lastActiveId === null) return;
@@ -147,12 +151,16 @@ export default function ExploreGlobe({
 
     controls.addEventListener("start", () => {
       isDragging = true;
+      hasRotatedEnough = false;
       manualExploring = true;
       controls.autoRotate = false;
+      dragStartCam.copy(camera.position);
+      clearActivePost();
     });
 
     controls.addEventListener("end", () => {
       isDragging = false;
+      hasRotatedEnough = false;
       manualExploring = false;
       controls.autoRotate = true;
       clearActivePost();
@@ -253,10 +261,19 @@ export default function ExploreGlobe({
         mesh.visible = facing > MARKER_FACE_MIN;
       }
 
+      if (isDragging && !hasRotatedEnough) {
+        const dx = camera.position.x - dragStartCam.x;
+        const dy = camera.position.y - dragStartCam.y;
+        const dz = camera.position.z - dragStartCam.z;
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) >= DRAG_MOVE_THRESHOLD) {
+          hasRotatedEnough = true;
+        }
+      }
+
       let bestPost: GlobePost | null = null;
       let bestScore = FACE_THRESHOLD;
 
-      if (isDragging && manualExploring) {
+      if (isDragging && manualExploring && hasRotatedEnough) {
         for (const post of MOCK_GLOBE_POSTS) {
           const marker = markers.find((m) => m.id === post.id);
           if (!marker || !marker.mesh.visible) continue;
@@ -269,10 +286,12 @@ export default function ExploreGlobe({
         }
       }
 
-      if (isDragging && bestPost) {
+      if (isDragging && hasRotatedEnough && bestPost) {
         setActivePost(bestPost);
-      } else if (isDragging) {
+      } else if (isDragging && hasRotatedEnough) {
         if (lastActiveId !== null) setActivePost(null);
+      } else if (isDragging && lastActiveId !== null) {
+        clearActivePost();
       } else if (lastActiveId !== null) {
         clearActivePost();
       }
