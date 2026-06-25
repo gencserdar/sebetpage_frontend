@@ -63,20 +63,37 @@ export default function ExploreCommunityShowcase({
   const [visibleIds, setVisibleIds] = useState<string[]>(INITIAL_SHOWCASE_IDS);
   const [exitingIds, setExitingIds] = useState<Set<string>>(() => new Set());
   const [enteringIds, setEnteringIds] = useState<Set<string>>(() => new Set());
+  const [viewportTier, setViewportTier] = useState<"mobile" | "desktop">(() =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 900px)").matches
+      ? "mobile"
+      : "desktop"
+  );
   const slotCacheRef = useRef<Map<string, ShowcaseRingSlot>>(new Map());
   const exitSlotsRef = useRef<Map<string, ShowcaseRingSlot>>(new Map());
   const visibleRef = useRef(visibleIds);
   visibleRef.current = visibleIds;
 
+  const isMobile = viewportTier === "mobile";
+
   const liveSlots = useMemo(
-    () => computeRingSlots(visibleIds),
-    [visibleIds]
+    () => computeRingSlots(visibleIds, isMobile),
+    [visibleIds, isMobile]
   );
 
   const ringLayout = useMemo(
-    () => computeRingLayout(visibleIds.length),
-    [visibleIds.length]
+    () => computeRingLayout(visibleIds.length, isMobile),
+    [visibleIds.length, isMobile]
   );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const onChange = () => {
+      setViewportTier(mq.matches ? "mobile" : "desktop");
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const showcaseStyle = useMemo(
     () =>
@@ -117,10 +134,10 @@ export default function ExploreCommunityShowcase({
         if (next.includes(match.id)) continue;
 
         if (next.length >= SHOWCASE_MAX_VISIBLE) {
-          const slots = computeRingSlots(next);
+          const slots = computeRingSlots(next, isMobile);
           const evictId = pickEvictionId(next, slots, protect);
           if (!evictId) continue;
-          const evictSlots = computeRingSlots(visibleRef.current);
+          const evictSlots = computeRingSlots(visibleRef.current, isMobile);
           const frozen = evictSlots.get(evictId);
           if (frozen) exitSlotsRef.current.set(evictId, frozen);
           exiting.push(evictId);
@@ -166,7 +183,7 @@ export default function ExploreCommunityShowcase({
     }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [trimmed, hasFilter]);
+  }, [trimmed, hasFilter, isMobile]);
 
   const renderIds = useMemo(() => {
     const ids = [...visibleIds];

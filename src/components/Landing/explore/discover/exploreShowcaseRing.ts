@@ -87,13 +87,14 @@ export function entryWrapPosition(
   }
 }
 
-function ringRadiusBase(count: number) {
+function ringRadiusBase(count: number, isMobile = false) {
   const n = Math.max(1, count);
-  return 26 + (n / 15) * 22;
+  const base = 26 + (n / 15) * 22;
+  return isMobile ? base * 0.68 : base;
 }
 
-export function computeRingLayout(cardCount: number) {
-  const radius = ringRadiusBase(cardCount) + 5;
+export function computeRingLayout(cardCount: number, isMobile = false) {
+  const radius = ringRadiusBase(cardCount, isMobile) + 5;
   return {
     orbitWidth: `${(radius * 2 * 0.96).toFixed(2)}%`,
     orbitHeight: `${(radius * 2 * 0.98).toFixed(2)}%`,
@@ -126,12 +127,15 @@ export function dissolvePullTowardCenter(slot: ShowcaseRingSlot) {
   };
 }
 
-export function computeRingSlots(ids: string[]): Map<string, ShowcaseRingSlot> {
+export function computeRingSlots(
+  ids: string[],
+  isMobile = false
+): Map<string, ShowcaseRingSlot> {
   const map = new Map<string, ShowcaseRingSlot>();
   const n = ids.length;
   if (n === 0) return map;
 
-  const radiusBase = ringRadiusBase(n);
+  const radiusBase = ringRadiusBase(n, isMobile);
 
   ids.forEach((id, index) => {
     const seed = hashId(id);

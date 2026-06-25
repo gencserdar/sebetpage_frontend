@@ -1264,6 +1264,11 @@ body::after {
   font-weight: 700;
   line-height: 1.3;
   color: #fff;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .landing-discover-card__desc {
@@ -1485,7 +1490,49 @@ body::after {
   }
 
   .landing-discover__showcase {
-    min-height: 24rem;
+    min-height: 22rem;
+    overflow: hidden;
+  }
+
+  .landing-discover__pile {
+    transform: scale(0.86);
+    transform-origin: 50% 50%;
+  }
+
+  .landing-discover-card-wrap {
+    width: min(10.75rem, 58vw);
+    max-width: calc(100% - 1.5rem);
+  }
+
+  .landing-discover-card {
+    padding: 0.62rem 0.72rem 0.58rem;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .landing-discover-card__name {
+    font-size: 0.86rem;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  .landing-discover-card__desc {
+    margin-top: 0.28rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .landing-discover-card__meta {
+    margin-top: 0.45rem;
+    font-size: 0.7rem;
   }
 
   .landing-share__showcase {
@@ -1494,10 +1541,6 @@ body::after {
 
   .landing-share__globe-stage {
     width: min(100%, 26rem);
-  }
-
-  .landing-discover-card-wrap {
-    width: min(14rem, 78vw);
   }
 }
 
@@ -1727,6 +1770,24 @@ body::after {
 .landing-back:hover {
   transform: translateX(-3px);
   background: rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 900px) {
+  .landing-back {
+    top: auto;
+    right: auto;
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    left: max(0.75rem, env(safe-area-inset-left, 0px));
+    width: auto;
+    height: auto;
+    padding: 0.48rem 0.62rem;
+    font-size: 0.78rem;
+    gap: 0.3rem;
+  }
+
+  .landing-back:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* Brief dim that masks the bright↔dark clash while the panes slide across. */
