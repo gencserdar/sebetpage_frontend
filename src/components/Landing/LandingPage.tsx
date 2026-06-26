@@ -32,6 +32,7 @@ import ExploreFluidGradient, {
 } from "./explore/fluidGradient/ExploreFluidGradient";
 import ExploreDiscoverStage from "./explore/discover/ExploreDiscoverStage";
 import ExploreShareStage from "./explore/share/ExploreShareStage";
+import ExplorePlansStage from "./explore/plans/ExplorePlansStage";
 import { radialExitOffset } from "./explore/discover/exploreShowcaseRing";
 import type { FluidPalette } from "./explore/exploreFluidPalettes";
 import {
@@ -96,7 +97,7 @@ const heroSlides: HeroSlide[] = [
     hue: 200,
     title: "Make plans happen.",
     subtitle:
-      "Create events, invite friends, and organize unforgettable experiences together.",
+      "Turn a casual idea into something real. Set the time, pick a spot, and invite the people. Keep everyone on the same page with updates, and store photos on your event page so your memories will never fade away.",
     block: "top",
     lines: [
       { text: "Make plans", from: "top", align: "left", color: "#BD69F5" },
@@ -477,6 +478,63 @@ function globeGlide(t: number) {
 }
 
 const SHARE_GLOBE_TRAVEL = 14;
+
+function shouldAllowNestedWheelScroll(
+  target: EventTarget | null,
+  boundary: HTMLElement,
+  deltaY: number,
+  deltaX = 0
+): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  let node: HTMLElement | null = target;
+  while (node && node !== boundary) {
+    const { overflowX, overflowY } = window.getComputedStyle(node);
+    const canScrollY =
+      (overflowY === "auto" || overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight + 1;
+    const canScrollX =
+      (overflowX === "auto" || overflowX === "scroll") &&
+      node.scrollWidth > node.clientWidth + 1;
+
+    if (canScrollY) {
+      const atTop = node.scrollTop <= 0;
+      const atBottom =
+        node.scrollTop + node.clientHeight >= node.scrollHeight - 1;
+      if ((deltaY > 0 && !atBottom) || (deltaY < 0 && !atTop)) {
+        return true;
+      }
+    }
+
+    if (canScrollX) {
+      const atLeft = node.scrollLeft <= 0;
+      const atRight =
+        node.scrollLeft + node.clientWidth >= node.scrollWidth - 1;
+      if ((deltaX > 0 && !atRight) || (deltaX < 0 && !atLeft)) {
+        return true;
+      }
+    }
+
+    node = node.parentElement;
+  }
+
+  return false;
+}
+
+const EXPLORE_TOUCH_SWIPE_THRESHOLD = 52;
+
+function isExploreScrollSurfaceTarget(
+  target: EventTarget | null,
+  scroll: HTMLElement
+) {
+  if (!(target instanceof Node)) return false;
+  return target === scroll || scroll.contains(target);
+}
+
+function shouldBlockExploreSectionGesture(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest(".landing-share__globe-stage"));
+}
 
 function shareGlobeY(t: number, scrollDir: number) {
   if (t <= -1 || t >= 1) return 0;
@@ -1440,6 +1498,14 @@ export default function LandingPage({
     };
 
     const onWheel = (e: WheelEvent) => {
+      if (shouldAllowNestedWheelScroll(e.target, pane, e.deltaY)) {
+        return;
+      }
+
+      if (shouldBlockExploreSectionGesture(e.target)) {
+        return;
+      }
+
       e.preventDefault();
       if (wheelLockRef.current) return;
       const vh = scroll.clientHeight;
@@ -1455,9 +1521,104 @@ export default function LandingPage({
       updateScrollFx();
     };
 
+    let touchStart: { x: number; y: number } | null = null;
+    let touchAxis: "x" | "y" | null = null;
+    let touchClaimed = false;
+    let touchOnScrollSurface = false;
+
+    const resetTouch = () => {
+      touchStart = null;
+      touchAxis = null;
+      touchClaimed = false;
+      touchOnScrollSurface = false;
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        resetTouch();
+        return;
+      }
+
+      touchStart = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+      touchAxis = null;
+      touchClaimed = shouldBlockExploreSectionGesture(e.target);
+      touchOnScrollSurface = isExploreScrollSurfaceTarget(e.target, scroll);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!touchStart || touchOnScrollSurface || e.touches.length !== 1) return;
+
+      const dy = e.touches[0].clientY - touchStart.y;
+      const dx = e.touches[0].clientX - touchStart.x;
+
+      if (!touchAxis) {
+        if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
+        touchAxis = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
+      }
+
+      if (touchClaimed) return;
+
+      if (touchAxis === "x") {
+        if (shouldAllowNestedWheelScroll(e.target, pane, 0, -dx)) {
+          touchClaimed = true;
+        }
+        return;
+      }
+
+      if (shouldAllowNestedWheelScroll(e.target, pane, -dy)) {
+        touchClaimed = true;
+        return;
+      }
+
+      if (shouldBlockExploreSectionGesture(e.target)) {
+        touchClaimed = true;
+        return;
+      }
+
+      if (Math.abs(dy) > 12) {
+        e.preventDefault();
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touchStart || touchOnScrollSurface || touchClaimed || touchAxis !== "y") {
+        resetTouch();
+        return;
+      }
+
+      const touch = e.changedTouches[0];
+      const dy = touch.clientY - touchStart.y;
+      resetTouch();
+
+      if (Math.abs(dy) < EXPLORE_TOUCH_SWIPE_THRESHOLD) return;
+      if (wheelLockRef.current) return;
+
+      const vh = scroll.clientHeight;
+      if (vh <= 0) return;
+      const current = Math.round(scroll.scrollTop / vh);
+      if (dy < 0 && current < count - 1) snapTo(current + 1);
+      else if (dy > 0 && current > 0) snapTo(current - 1);
+    };
+
     scroll.addEventListener("scroll", onScroll, { passive: true });
     scroll.addEventListener("scrollend", onScrollEnd);
     pane.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    pane.addEventListener("touchstart", onTouchStart, {
+      passive: true,
+      capture: true,
+    });
+    pane.addEventListener("touchmove", onTouchMove, {
+      passive: false,
+      capture: true,
+    });
+    pane.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
+    pane.addEventListener("touchcancel", onTouchEnd, {
+      passive: true,
+      capture: true,
+    });
     const ro = new ResizeObserver(() => updateScrollFx());
     ro.observe(scroll);
     updateScrollFx();
@@ -1465,6 +1626,10 @@ export default function LandingPage({
       scroll.removeEventListener("scroll", onScroll);
       scroll.removeEventListener("scrollend", onScrollEnd);
       pane.removeEventListener("wheel", onWheel, { capture: true });
+      pane.removeEventListener("touchstart", onTouchStart, { capture: true });
+      pane.removeEventListener("touchmove", onTouchMove, { capture: true });
+      pane.removeEventListener("touchend", onTouchEnd, { capture: true });
+      pane.removeEventListener("touchcancel", onTouchEnd, { capture: true });
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
       if (jumpRafRef.current) cancelAnimationFrame(jumpRafRef.current);
@@ -1539,7 +1704,9 @@ export default function LandingPage({
                     ? " landing-section__inner--discover"
                     : i === 1
                       ? " landing-section__inner--share"
-                      : ""
+                      : i === 2
+                        ? " landing-section__inner--plans"
+                        : ""
                 }`}
                 ref={(el) => {
                   innerRefs.current[i] = el;
@@ -1549,6 +1716,8 @@ export default function LandingPage({
                   <ExploreDiscoverStage subtitle={s.subtitle} />
                 ) : i === 1 ? (
                   <ExploreShareStage subtitle={s.subtitle} />
+                ) : i === 2 ? (
+                  <ExplorePlansStage subtitle={s.subtitle} />
                 ) : (
                   <>
                     <h2 className="landing-section__title">{s.title}</h2>

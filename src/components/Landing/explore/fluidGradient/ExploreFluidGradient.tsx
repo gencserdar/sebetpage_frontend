@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import {
   buildFluidBaseGradient,
@@ -9,7 +9,11 @@ import {
   type FluidPalette,
 } from "../exploreFluidPalettes";
 import { createFluidGradient } from "./createFluidGradient";
-import { detectGpuProfile } from "./gpuProfile";
+import {
+  detectGpuProfile,
+  FLUID_MOBILE_VIEWPORT_MQ,
+  isMobileFluidViewport,
+} from "./gpuProfile";
 import {
   adaptiveColorBlend,
   applyPaletteToConfig,
@@ -86,7 +90,16 @@ export default function ExploreFluidGradient({
   const rafRef = useRef(0);
   const paletteJumpActiveRef = useRef(false);
   const gpuProfile = useMemo(() => detectGpuProfile(), []);
-  const useCssFallback = gpuProfile === "css-only";
+  const [mobileViewport, setMobileViewport] = useState(isMobileFluidViewport);
+  const useCssFallback = gpuProfile === "css-only" || mobileViewport;
+
+  useEffect(() => {
+    const mq = window.matchMedia(FLUID_MOBILE_VIEWPORT_MQ);
+    const onChange = () => setMobileViewport(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   activeRef.current = active;
 

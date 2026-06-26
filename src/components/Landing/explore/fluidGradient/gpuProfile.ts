@@ -1,5 +1,15 @@
 export type GpuProfile = "full" | "reduced" | "css-only";
 
+/** Matches landing explore mobile layout breakpoint. */
+export const FLUID_MOBILE_VIEWPORT_MQ = "(max-width: 900px)";
+
+export function isMobileFluidViewport() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia(FLUID_MOBILE_VIEWPORT_MQ).matches
+  );
+}
+
 const SOFTWARE_RENDERER_RE =
   /swiftshader|llvmpipe|softpipe|software|microsoft basic render|virgl|mesa offscreen|samsung xclipse.*software/i;
 
@@ -79,6 +89,11 @@ let cachedProfile: GpuProfile | null = null;
 /** Detect whether fluid WebGL is viable on this device/browser. */
 export function detectGpuProfile(): GpuProfile {
   if (cachedProfile) return cachedProfile;
+
+  if (isMobileFluidViewport()) {
+    cachedProfile = "css-only";
+    return cachedProfile;
+  }
 
   const strict = tryContext(true);
   if (!strict) {

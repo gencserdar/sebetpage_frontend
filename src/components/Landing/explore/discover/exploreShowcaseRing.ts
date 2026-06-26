@@ -49,11 +49,12 @@ function angleToEdge(angle: number): ShowcaseEntryEdge {
 export function entryWrapPosition(
   edge: ShowcaseEntryEdge,
   finalTop: string,
-  finalLeft: string
+  finalLeft: string,
+  isMobile = false
 ): { top: string; left: string } {
   const t = Number.parseFloat(finalTop);
   const l = Number.parseFloat(finalLeft);
-  const pull = 44;
+  const pull = isMobile ? 22 : 44;
 
   switch (edge) {
     case "top":
@@ -90,10 +91,21 @@ export function entryWrapPosition(
 function ringRadiusBase(count: number, isMobile = false) {
   const n = Math.max(1, count);
   const base = 26 + (n / 15) * 22;
-  return isMobile ? base * 0.68 : base;
+  if (!isMobile) return base;
+
+  const spread = base * 0.9;
+  const crowdEase = Math.max(0, n - 5) * 1.1;
+  return Math.max(27, spread - crowdEase);
 }
 
 export function computeRingLayout(cardCount: number, isMobile = false) {
+  if (isMobile) {
+    return {
+      orbitWidth: "100%",
+      orbitHeight: "88%",
+    };
+  }
+
   const radius = ringRadiusBase(cardCount, isMobile) + 5;
   return {
     orbitWidth: `${(radius * 2 * 0.96).toFixed(2)}%`,
@@ -136,6 +148,8 @@ export function computeRingSlots(
   if (n === 0) return map;
 
   const radiusBase = ringRadiusBase(n, isMobile);
+  const xSpread = isMobile ? 0.94 : 0.96;
+  const ySpread = isMobile ? 0.96 : 0.98;
 
   ids.forEach((id, index) => {
     const seed = hashId(id);
@@ -143,16 +157,31 @@ export function computeRingSlots(
     const angle =
       (index / n) * Math.PI * 2 -
       Math.PI / 2 +
-      jitter(seed, -0.09, 0.09);
-    const radius = radiusBase + jitter(seed + 7, -1.5, 1.5);
-    const x = 50 + radius * Math.cos(angle) * 0.96;
-    const y = 50 + radius * Math.sin(angle) * 0.98;
+      jitter(seed, isMobile ? -0.06 : -0.09, isMobile ? 0.06 : 0.09);
+    const radiusJitter = jitter(
+      seed + 7,
+      isMobile ? -1 : -1.5,
+      isMobile ? 1 : 1.5
+    );
+    const layer =
+      isMobile && n >= 5 ? (index % 2 === 0 ? 1 : 0.8) : 1;
+    const radius = (radiusBase + radiusJitter) * layer;
+    const x = 50 + radius * Math.cos(angle) * xSpread;
+    const y = 50 + radius * Math.sin(angle) * ySpread;
     const top = `${y.toFixed(2)}%`;
     const left = `${x.toFixed(2)}%`;
     const edge = angleToEdge(angle);
-    const enter = entryWrapPosition(edge, top, left);
-    const rotate = jitter(seed + 13, -7, 7);
-    const driftPx = jitter(seed + 19, 0, 1) > 0.5 ? "-11px" : "10px";
+    const enter = entryWrapPosition(edge, top, left, isMobile);
+    const rotate = isMobile
+      ? jitter(seed + 13, -4, 4)
+      : jitter(seed + 13, -7, 7);
+    const driftPx = isMobile
+      ? jitter(seed + 19, 0, 1) > 0.5
+        ? "-6px"
+        : "5px"
+      : jitter(seed + 19, 0, 1) > 0.5
+        ? "-11px"
+        : "10px";
 
     map.set(id, {
       top,

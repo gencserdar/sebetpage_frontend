@@ -23,6 +23,9 @@ import {
   type MockDiscoverCommunity,
 } from "./mockDiscoverCommunities";
 
+const SHOWCASE_MAX_VISIBLE_MOBILE = 6;
+const SHOWCASE_INITIAL_COUNT_MOBILE = 5;
+
 const ENTER_MS = 720;
 const EXIT_MS = 1020;
 const SEARCH_DEBOUNCE_MS = 260;
@@ -60,7 +63,14 @@ export default function ExploreCommunityShowcase({
   const trimmed = query.trim();
   const hasFilter = trimmed.length > 0;
 
-  const [visibleIds, setVisibleIds] = useState<string[]>(INITIAL_SHOWCASE_IDS);
+  const [visibleIds, setVisibleIds] = useState<string[]>(() => {
+    const mobile =
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 900px)").matches;
+    return mobile
+      ? INITIAL_SHOWCASE_IDS.slice(0, SHOWCASE_INITIAL_COUNT_MOBILE)
+      : INITIAL_SHOWCASE_IDS;
+  });
   const [exitingIds, setExitingIds] = useState<Set<string>>(() => new Set());
   const [enteringIds, setEnteringIds] = useState<Set<string>>(() => new Set());
   const [viewportTier, setViewportTier] = useState<"mobile" | "desktop">(() =>
@@ -75,6 +85,9 @@ export default function ExploreCommunityShowcase({
   visibleRef.current = visibleIds;
 
   const isMobile = viewportTier === "mobile";
+  const showcaseMaxVisible = isMobile
+    ? SHOWCASE_MAX_VISIBLE_MOBILE
+    : SHOWCASE_MAX_VISIBLE;
 
   const liveSlots = useMemo(
     () => computeRingSlots(visibleIds, isMobile),
@@ -94,6 +107,13 @@ export default function ExploreCommunityShowcase({
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setVisibleIds((prev) =>
+      prev.length > showcaseMaxVisible ? prev.slice(0, showcaseMaxVisible) : prev
+    );
+  }, [isMobile, showcaseMaxVisible]);
 
   const showcaseStyle = useMemo(
     () =>
@@ -133,7 +153,7 @@ export default function ExploreCommunityShowcase({
       for (const match of matches) {
         if (next.includes(match.id)) continue;
 
-        if (next.length >= SHOWCASE_MAX_VISIBLE) {
+        if (next.length >= showcaseMaxVisible) {
           const slots = computeRingSlots(next, isMobile);
           const evictId = pickEvictionId(next, slots, protect);
           if (!evictId) continue;
@@ -183,7 +203,7 @@ export default function ExploreCommunityShowcase({
     }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [trimmed, hasFilter, isMobile]);
+  }, [trimmed, hasFilter, isMobile, showcaseMaxVisible]);
 
   const renderIds = useMemo(() => {
     const ids = [...visibleIds];
