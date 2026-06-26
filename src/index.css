@@ -1004,6 +1004,13 @@ body::after {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transform-origin: 50% 0%;
+  opacity: 0;
+  transform: translate3d(0, -26%, 0) scale(1.14);
+}
+
+.landing-plans-demo.is-stage-intro .landing-plans-demo__creator {
+  animation: landing-plans-calendar-drop 0.68s cubic-bezier(0.33, 1, 0.45, 1) forwards;
 }
 
 .landing-plans-demo__creator > * {
@@ -1019,6 +1026,12 @@ body::after {
   background: rgba(0, 0, 0, 0.14);
   display: flex;
   flex-direction: column;
+  opacity: 0;
+  transform: translate3d(18%, 0, 0);
+}
+
+.landing-plans-demo.is-stage-intro .landing-plans-demo__recipient {
+  animation: landing-plans-inbox-enter 0.6s cubic-bezier(0.33, 1, 0.45, 1) 0.66s forwards;
 }
 
 .landing-plans-demo__recipient > * {
@@ -1030,12 +1043,48 @@ body::after {
   flex-shrink: 0;
   height: 1px;
   margin-top: 0.15rem;
+  opacity: 0;
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0),
     rgba(255, 255, 255, 0.18),
     rgba(255, 255, 255, 0)
   );
+}
+
+.landing-plans-demo.is-stage-intro .landing-plans-demo__split {
+  animation: landing-plans-split-fade 0.38s ease 0.62s forwards;
+}
+
+@keyframes landing-plans-calendar-drop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -26%, 0) scale(1.14);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes landing-plans-inbox-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(18%, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes landing-plans-split-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .landing-plans-demo__calendar {
@@ -2729,6 +2778,17 @@ body::after {
   .landing-discover-card--floating.is-exiting {
     opacity: 0;
     transition: opacity 0.35s ease;
+  }
+
+  .landing-plans-demo__creator,
+  .landing-plans-demo__recipient,
+  .landing-plans-demo__split,
+  .landing-plans-demo.is-stage-intro .landing-plans-demo__creator,
+  .landing-plans-demo.is-stage-intro .landing-plans-demo__recipient,
+  .landing-plans-demo.is-stage-intro .landing-plans-demo__split {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 

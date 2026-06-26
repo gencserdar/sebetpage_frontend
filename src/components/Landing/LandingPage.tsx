@@ -1175,6 +1175,51 @@ export default function LandingPage({
         return;
       }
 
+      if (inner.classList.contains("landing-section__inner--plans")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity;
+        const opacityStr = opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const storyCopy = inner.querySelector<HTMLElement>(
+          ".landing-plans__story-copy"
+        );
+        const showcase = inner.querySelector<HTMLElement>(
+          ".landing-plans__showcase"
+        );
+        const demo = inner.querySelector<HTMLElement>(".landing-plans-demo");
+
+        if (storyCopy) {
+          storyCopy.style.opacity = opacityStr;
+          storyCopy.style.visibility = visibility;
+          storyCopy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (showcase) {
+          showcase.style.opacity = opacityStr;
+          showcase.style.visibility = visibility;
+          showcase.style.transform = "none";
+        }
+        if (demo) {
+          const armed = demo.dataset.stageIntroArmed === "1";
+          if (motion.visible && opacity > 0.72) {
+            if (!armed) {
+              demo.classList.remove("is-stage-intro");
+              void demo.offsetWidth;
+              demo.classList.add("is-stage-intro");
+              demo.dataset.stageIntroArmed = "1";
+            }
+          } else if (opacity < 0.2) {
+            demo.classList.remove("is-stage-intro");
+            delete demo.dataset.stageIntroArmed;
+          }
+        }
+        return;
+      }
+
       inner.style.opacity = motion.opacity.toFixed(3);
       inner.style.visibility = motion.visible ? "visible" : "hidden";
       inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
