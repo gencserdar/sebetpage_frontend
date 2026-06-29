@@ -33,6 +33,8 @@ import ExploreFluidGradient, {
 import ExploreDiscoverStage from "./explore/discover/ExploreDiscoverStage";
 import ExploreShareStage from "./explore/share/ExploreShareStage";
 import ExplorePlansStage from "./explore/plans/ExplorePlansStage";
+import ExploreTalkStage from "./explore/talk/ExploreTalkStage";
+import ExploreSpaceStage from "./explore/space/ExploreSpaceStage";
 import { radialExitOffset } from "./explore/discover/exploreShowcaseRing";
 import type { FluidPalette } from "./explore/exploreFluidPalettes";
 import {
@@ -109,7 +111,7 @@ const heroSlides: HeroSlide[] = [
     hue: 280,
     title: "Talk like you're there.",
     subtitle:
-      "Jump into voice rooms and stay connected, whether you're gaming, studying, or just hanging out.",
+      "In communities uthorized members can create voice rooms where people drop in and hang out—game nights, study sessions, or just background chatter. When it's only your crew, start a call with your friend group and keep it between you. Same room energy, with or without the crowd.",
     block: "bottom",
     lines: [
       { text: "Talk like", from: "right", align: "right", color: "#899499" },
@@ -121,7 +123,7 @@ const heroSlides: HeroSlide[] = [
     hue: 150,
     title: "Your Space. Your Rules.",
     subtitle:
-      "Customize your profile, communities, and events to create a social experience that truly feels like yours.",
+      "Your profile has a canvas — a little grid you arrange with bio blocks, links, quotes, and whatever else feels like you. We care about creativity here, so we try not to box you into a template. Move things around, leave blank space, make it loud or quiet. This corner is yours to shape.",
     block: "between",
     lines: [
       { text: "Your Space.", from: "left", align: "left", color: "#C1E34F" },
@@ -1220,6 +1222,87 @@ export default function LandingPage({
         return;
       }
 
+      if (inner.classList.contains("landing-section__inner--talk")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity;
+        const opacityStr = opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const storyCopy = inner.querySelector<HTMLElement>(
+          ".landing-talk__story-copy"
+        );
+        const picker = inner.querySelector<HTMLElement>(".landing-talk__picker");
+        const showcase = inner.querySelector<HTMLElement>(
+          ".landing-talk__showcase"
+        );
+        const talk = inner.querySelector<HTMLElement>(".landing-talk");
+
+        if (storyCopy) {
+          storyCopy.style.opacity = opacityStr;
+          storyCopy.style.visibility = visibility;
+          storyCopy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (picker) {
+          picker.style.opacity = opacityStr;
+          picker.style.visibility = visibility;
+          picker.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (showcase) {
+          showcase.style.opacity = opacityStr;
+          showcase.style.visibility = visibility;
+          showcase.style.transform = "none";
+        }
+        if (talk) {
+          const armed = talk.dataset.stageIntroArmed === "1";
+          if (motion.visible && opacity > 0.55) {
+            if (!armed) {
+              talk.classList.remove("is-stage-intro");
+              void talk.offsetWidth;
+              talk.classList.add("is-stage-intro");
+              talk.dataset.stageIntroArmed = "1";
+            }
+          } else if (opacity < 0.15) {
+            talk.classList.remove("is-stage-intro");
+            delete talk.dataset.stageIntroArmed;
+          }
+        }
+        return;
+      }
+
+      if (inner.classList.contains("landing-section__inner--space")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity;
+        const opacityStr = opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const storyCopy = inner.querySelector<HTMLElement>(
+          ".landing-space__story-copy"
+        );
+        const showcase = inner.querySelector<HTMLElement>(
+          ".landing-space__showcase"
+        );
+
+        if (storyCopy) {
+          storyCopy.style.opacity = opacityStr;
+          storyCopy.style.visibility = visibility;
+          storyCopy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (showcase) {
+          showcase.style.opacity = opacityStr;
+          showcase.style.visibility = visibility;
+          showcase.style.transform = "none";
+        }
+        return;
+      }
+
       inner.style.opacity = motion.opacity.toFixed(3);
       inner.style.visibility = motion.visible ? "visible" : "hidden";
       inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
@@ -1751,7 +1834,11 @@ export default function LandingPage({
                       ? " landing-section__inner--share"
                       : i === 2
                         ? " landing-section__inner--plans"
-                        : ""
+                        : i === 3
+                          ? " landing-section__inner--talk"
+                          : i === 4
+                            ? " landing-section__inner--space"
+                            : ""
                 }`}
                 ref={(el) => {
                   innerRefs.current[i] = el;
@@ -1763,6 +1850,10 @@ export default function LandingPage({
                   <ExploreShareStage subtitle={s.subtitle} />
                 ) : i === 2 ? (
                   <ExplorePlansStage subtitle={s.subtitle} />
+                ) : i === 3 ? (
+                  <ExploreTalkStage subtitle={s.subtitle} />
+                ) : i === 4 ? (
+                  <ExploreSpaceStage subtitle={s.subtitle} />
                 ) : (
                   <>
                     <h2 className="landing-section__title">{s.title}</h2>
