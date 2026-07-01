@@ -35,6 +35,7 @@ import ExploreShareStage from "./explore/share/ExploreShareStage";
 import ExplorePlansStage from "./explore/plans/ExplorePlansStage";
 import ExploreTalkStage from "./explore/talk/ExploreTalkStage";
 import ExploreSpaceStage from "./explore/space/ExploreSpaceStage";
+import ExplorePrivacyStage from "./explore/privacy/ExplorePrivacyStage";
 import { radialExitOffset } from "./explore/discover/exploreShowcaseRing";
 import type { FluidPalette } from "./explore/exploreFluidPalettes";
 import {
@@ -135,11 +136,11 @@ const heroSlides: HeroSlide[] = [
     hue: 215,
     title: "Privacy on your terms.",
     subtitle:
-      "Control who sees your profile, joins your communities, and accesses your content.",
-    block: "center",
+      "Communities can stay private when you want them to—hidden from search and open only to people you invite. Groups inside a community can be kept from other members who do not need to see them. Add an optional password before anyone enters a community or group. And when you need a break or want to leave for good, freeze your account or delete it whenever you are ready.",
+    block: "between",
     lines: [
-      { text: "Privacy", from: "bottom", align: "center", color:"#4F8FE3" },
-      { text: "on your terms.", from: "bottom", align: "center", color: "#ffffff" },
+      { text: "Privacy", from: "left", align: "left", color: "#4F8FE3" },
+      { text: "on your terms.", from: "right", align: "right", color: "#ffffff" },
     ],
   },
   {
@@ -1303,6 +1304,36 @@ export default function LandingPage({
         return;
       }
 
+      if (inner.classList.contains("landing-section__inner--privacy")) {
+        inner.style.opacity = "1";
+        inner.style.visibility = motion.visible ? "visible" : "hidden";
+        inner.style.transform = "none";
+
+        const opacity = motion.opacity;
+        const opacityStr = opacity.toFixed(3);
+        const textX = motion.x.toFixed(2);
+        const visibility = motion.visible ? "visible" : "hidden";
+
+        const storyCopy = inner.querySelector<HTMLElement>(
+          ".landing-privacy__story-copy"
+        );
+        const showcase = inner.querySelector<HTMLElement>(
+          ".landing-privacy__showcase"
+        );
+
+        if (storyCopy) {
+          storyCopy.style.opacity = opacityStr;
+          storyCopy.style.visibility = visibility;
+          storyCopy.style.transform = `translate3d(${textX}%, 0, 0)`;
+        }
+        if (showcase) {
+          showcase.style.opacity = opacityStr;
+          showcase.style.visibility = visibility;
+          showcase.style.transform = "none";
+        }
+        return;
+      }
+
       inner.style.opacity = motion.opacity.toFixed(3);
       inner.style.visibility = motion.visible ? "visible" : "hidden";
       inner.style.transform = `translate3d(${motion.x.toFixed(2)}%, 0, 0)`;
@@ -1838,7 +1869,9 @@ export default function LandingPage({
                           ? " landing-section__inner--talk"
                           : i === 4
                             ? " landing-section__inner--space"
-                            : ""
+                            : i === 5
+                              ? " landing-section__inner--privacy"
+                              : ""
                 }`}
                 ref={(el) => {
                   innerRefs.current[i] = el;
@@ -1854,6 +1887,8 @@ export default function LandingPage({
                   <ExploreTalkStage subtitle={s.subtitle} />
                 ) : i === 4 ? (
                   <ExploreSpaceStage subtitle={s.subtitle} />
+                ) : i === 5 ? (
+                  <ExplorePrivacyStage subtitle={s.subtitle} />
                 ) : (
                   <>
                     <h2 className="landing-section__title">{s.title}</h2>
